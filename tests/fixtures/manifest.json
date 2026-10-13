@@ -1,0 +1,56 @@
+[
+ {
+  "file": "cpsc/recalls_by_id.json",
+  "url": "https://www.saferproducts.gov/RestWebServices/Recall?format=json&RecallID=<id> for ids [10585, 10664, 10541, 10540, 10551, 10557, 10549, 10548, 10543, 10545, 10957, 10956, 10553]",
+  "fetched_at": "2026-10-13T23:27:23.798464+00:00",
+  "note": "one request per RecallID, concatenated in that order"
+ },
+ {
+  "file": "cpsc/last_publish_window.json",
+  "url": "https://www.saferproducts.gov/RestWebServices/Recall?format=json&LastPublishDateStart=2026-10-01&LastPublishDateEnd=2026-10-08",
+  "fetched_at": "2026-10-13T23:27:23.815836+00:00",
+  "note": "full window"
+ },
+ {
+  "file": "openfda/food_by_recall_number.json",
+  "url": "https://api.fda.gov/food/enforcement.json?search=recall_number%3A%28%22H-1398-2026%22+%22H-1403-2026%22+%22H-1242-2026%22+%22H-1239-2026%22+%22H-1015-2026%22%29&limit=100",
+  "fetched_at": "2026-10-13T23:27:24.062280+00:00",
+  "note": "full response incl. meta"
+ },
+ {
+  "file": "openfda/drug_by_recall_number.json",
+  "url": "https://api.fda.gov/drug/enforcement.json?search=recall_number%3A%28%22D-0010-2027%22+%22D-0876-2026%22+%22D-0854-2026%22+%22D-0870-2026%22%29&limit=100",
+  "fetched_at": "2026-10-13T23:27:24.179959+00:00",
+  "note": "full response incl. meta"
+ },
+ {
+  "file": "openfda/device_by_recall_number.json",
+  "url": "https://api.fda.gov/device/enforcement.json?search=recall_number%3A%28%22Z-3314-2026%22+%22Z-3333-2026%22+%22Z-3139-2026%22+%22Z-3248-2026%22+%22Z-0099-2026%22+%22Z-3270-2026%22%29&limit=100",
+  "fetched_at": "2026-10-13T23:27:24.342100+00:00",
+  "note": "full response incl. meta"
+ },
+ {
+  "file": "openfda/food_event_99887.json",
+  "url": "https://api.fda.gov/food/enforcement.json?search=event_id%3A99887&limit=100",
+  "fetched_at": "2026-10-13T23:27:24.449831+00:00",
+  "note": "one event"
+ },
+ {
+  "file": "openfda/food_page_limit3.json",
+  "url": "https://api.fda.gov/food/enforcement.json?search=report_date%3A%5B20260901+TO+20261007%5D&limit=3&sort=report_date%3Aasc",
+  "fetched_at": "2026-10-13T23:27:24.576540+00:00",
+  "note": "first page"
+ },
+ {
+  "file": "openfda/food_page_limit3.link.txt",
+  "url": "https://api.fda.gov/food/enforcement.json?search=report_date%3A%5B20260901+TO+20261007%5D&limit=3&sort=report_date%3Aasc",
+  "fetched_at": "2026-10-13T23:27:24.576970+00:00",
+  "note": "Link response header of the page above"
+ },
+ {
+  "file": "openfda/no_matches_404.json",
+  "url": "https://api.fda.gov/food/enforcement.json?search=recall_number%3A%22NOPE-0000-0000%22",
+  "fetched_at": "2026-10-13T23:27:24.682380+00:00",
+  "note": "HTTP 404 body"
+ }
+]

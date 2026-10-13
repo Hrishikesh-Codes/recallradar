@@ -1,0 +1,231 @@
+{
+ "meta": {
+  "disclaimer": "Do not rely on openFDA to make decisions regarding medical care. While we make every effort to ensure that data is accurate, you should assume all results are unvalidated. We may limit or otherwise restrict your access to the API in line with our Terms of Service.",
+  "terms": "https://open.fda.gov/terms/",
+  "license": "https://open.fda.gov/license/",
+  "last_updated": "2026-10-07",
+  "results": {
+   "skip": 0,
+   "limit": 100,
+   "total": 4
+  }
+ },
+ "results": [
+  {
+   "status": "Ongoing",
+   "city": "Tarrytown",
+   "state": "NY",
+   "country": "United States",
+   "classification": "Class II",
+   "openfda": {},
+   "product_type": "Drugs",
+   "event_id": "99909",
+   "recalling_firm": "Insight Pharmaceuticals LLC, a Prestige Consumer Healthcare company",
+   "address_1": "660 White Plains Rd Ste 250",
+   "address_2": "",
+   "postal_code": "10591-5171",
+   "voluntary_mandated": "Voluntary: Firm initiated",
+   "initial_firm_notification": "Letter",
+   "distribution_pattern": "Nationwide in the USA.",
+   "recall_number": "D-0870-2026",
+   "product_description": "Clear Eyes Redness Relief, Lubricant/Redness Reliever Eye Drops (glycerin 0.25%, naphazoline hydrochloride 0.012%) , 0.5 fl oz (15mL) per dropper bottle, STERILE, Dist. by Medtech Products Inc., Tarrytown, NY 10591.  NDC: 67172-797-15",
+   "product_quantity": "2,356,248 bottles",
+   "reason_for_recall": "Lack of Assurance of Sterility",
+   "recall_initiation_date": "20260915",
+   "center_classification_date": "20260923",
+   "report_date": "20260930",
+   "code_info": "Lot #: RL25G02, RL25G03, RL25G04, Exp. Date Jul-27; RL25H02, RL25H03, RL25H04, Exp. Date Aug-27; RL25K01, RL25K02, RL25K03, RL25K04, Exp. Date Sep-27; RL25M01, RL25M02, RL25M03, RL25M04, Exp. Date Oct-27; RL25N01, RL25N02, RL25N04, Exp. Date Nov-27.",
+   "more_code_info": ""
+  },
+  {
+   "status": "Ongoing",
+   "city": "Shantou",
+   "state": "",
+   "country": "China",
+   "classification": "Class II",
+   "openfda": {},
+   "product_type": "Drugs",
+   "event_id": "99625",
+   "recalling_firm": "SHANTOU Qiwei industrial Co., Ltd",
+   "address_1": "Xiashan",
+   "address_2": "Qiwei Building,Yingbinguan; Chaonan District",
+   "postal_code": "N/A",
+   "voluntary_mandated": "Voluntary: Firm initiated",
+   "initial_firm_notification": "Letter",
+   "distribution_pattern": "CA only",
+   "recall_number": "D-0854-2026",
+   "product_description": "MENOW SUNSCREEN PRESSED POWDER SPF35 PA+++, Net content, 9g/0.32 oz,  Manufactured by: Shantzu Qiwei Industry Co. Ltd, Add: Quiwei Building, Yingloinguan, Xiashan, Chaonan district, Shantou City, Guangdong Province, China",
+   "product_quantity": "2970 units",
+   "reason_for_recall": "cGMP Deviations",
+   "recall_initiation_date": "20260808",
+   "center_classification_date": "20260918",
+   "report_date": "20260930",
+   "code_info": "Lot #: 2024/10/11, Exp. Date 10/10/2027",
+   "more_code_info": ""
+  },
+  {
+   "status": "Ongoing",
+   "city": "Rochester",
+   "state": "MI",
+   "country": "United States",
+   "classification": "Class II",
+   "openfda": {
+    "application_number": [
+     "ANDA206586"
+    ],
+    "brand_name": [
+     "BUPRENORPHINE HYDROCHLORIDE"
+    ],
+    "generic_name": [
+     "BUPRENORPHINE HYDROCHLORIDE"
+    ],
+    "manufacturer_name": [
+     "Par Health USA, LLC"
+    ],
+    "product_ndc": [
+     "42023-179"
+    ],
+    "product_type": [
+     "HUMAN PRESCRIPTION DRUG"
+    ],
+    "route": [
+     "INTRAMUSCULAR",
+     "INTRAVENOUS"
+    ],
+    "substance_name": [
+     "BUPRENORPHINE HYDROCHLORIDE"
+    ],
+    "rxcui": [
+     "238129"
+    ],
+    "spl_id": [
+     "32a7af7e-3f90-4881-9075-473644237017"
+    ],
+    "spl_set_id": [
+     "34767dda-ce52-4f98-a45f-bb5cee0cd5e6"
+    ],
+    "package_ndc": [
+     "42023-179-05"
+    ],
+    "is_original_packager": [
+     true
+    ],
+    "unii": [
+     "56W8MW3EN1"
+    ]
+   },
+   "product_type": "Drugs",
+   "event_id": "99902",
+   "recalling_firm": "Par Health USA, LLC",
+   "address_1": "870 Parkdale Rd",
+   "address_2": "",
+   "postal_code": "48307-1740",
+   "voluntary_mandated": "Voluntary: Firm initiated",
+   "initial_firm_notification": "Letter",
+   "distribution_pattern": "U.S. Nationwide",
+   "recall_number": "D-0876-2026",
+   "product_description": "Buprenorphine Hydrochloride, Injection 0.3 mg/mL, Rx Only, 5 x 1 mL Single Dose Vials, Manufactured for: Endo USA, Malvern, PA, NDC 42023-179-05",
+   "product_quantity": "154210 bottles",
+   "reason_for_recall": "Crystallization",
+   "recall_initiation_date": "20260908",
+   "center_classification_date": "20260929",
+   "report_date": "20261007",
+   "code_info": "Lot#:83912, Exp Date 10/2026 Lot#:84234, Exp Date 11/2026 Lot#:84990, Exp Date 11/2026 Lot#:85003, Exp Date 12/2026 Lot#:86443, Exp Date 01/2027  Lot#:89909, Exp Date 05/2027",
+   "more_code_info": ""
+  },
+  {
+   "status": "Ongoing",
+   "city": "Bridgewater",
+   "state": "NJ",
+   "country": "United States",
+   "classification": "Class II",
+   "openfda": {
+    "application_number": [
+     "ANDA210054"
+    ],
+    "brand_name": [
+     "RANOLAZINE"
+    ],
+    "generic_name": [
+     "RANOLAZINE"
+    ],
+    "manufacturer_name": [
+     "Ajanta Pharma USA Inc."
+    ],
+    "product_ndc": [
+     "27241-125",
+     "27241-126"
+    ],
+    "product_type": [
+     "HUMAN PRESCRIPTION DRUG"
+    ],
+    "route": [
+     "ORAL"
+    ],
+    "substance_name": [
+     "RANOLAZINE"
+    ],
+    "rxcui": [
+     "616749",
+     "728231"
+    ],
+    "spl_id": [
+     "933f695e-e4f4-4c75-80fc-aea9a30aa13d"
+    ],
+    "spl_set_id": [
+     "8bfd1a61-547a-4847-ae4e-480b17da6272"
+    ],
+    "package_ndc": [
+     "27241-125-02",
+     "27241-125-05",
+     "27241-126-02",
+     "27241-126-05"
+    ],
+    "is_original_packager": [
+     true
+    ],
+    "upc": [
+     "0327241125027",
+     "0327241126024"
+    ],
+    "nui": [
+     "N0000175427",
+     "N0000190114",
+     "N0000185503",
+     "N0000182137",
+     "N0000187061"
+    ],
+    "pharm_class_epc": [
+     "Anti-anginal [EPC]"
+    ],
+    "pharm_class_moa": [
+     "Cytochrome P450 3A Inhibitors [MoA]",
+     "P-Glycoprotein Inhibitors [MoA]",
+     "Cytochrome P450 2D6 Inhibitors [MoA]",
+     "Organic Cation Transporter 2 Inhibitors [MoA]"
+    ],
+    "unii": [
+     "A6IEZ5M406"
+    ]
+   },
+   "product_type": "Drugs",
+   "event_id": "99893",
+   "recalling_firm": "Ajanta Pharma USA Inc",
+   "address_1": "400 Crossing Blvd Ste 102",
+   "address_2": "",
+   "postal_code": "08807-2863",
+   "voluntary_mandated": "Voluntary: Firm initiated",
+   "initial_firm_notification": "Letter",
+   "distribution_pattern": "Nationwide in the US.",
+   "recall_number": "D-0010-2027",
+   "product_description": "Ranolazine Extended-Release Tablets, 1000 mg, 60-count bottle, Rx Only, Marketed by: Ajanta Pharma USA Inc., Bridgewater, NJ 08807.  NDC: 27241-126-02",
+   "product_quantity": "",
+   "reason_for_recall": "Failed Dissolution Specifications: below specification",
+   "recall_initiation_date": "20260917",
+   "center_classification_date": "20261006",
+   "report_date": "20261007",
+   "code_info": "Lot: DJ25134, Exp 11/30/2028",
+   "more_code_info": ""
+  }
+ ]
+}

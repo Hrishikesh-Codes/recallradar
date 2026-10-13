@@ -37,6 +37,8 @@ why, and what it costs.
 - **Next.js 16 with Cache Components and typed routes.** Typed routes make a link to a page that
   doesn't exist a type error. TypeScript stays on 5.9, which `create-next-app` pins: TypeScript 7
   has no JavaScript compiler API yet (per the bundled Next.js docs).
+- **The product brief stays private.** The spec this project is built from isn't published;
+  code comments that cite "SPEC §x" refer to it.
 - **The API contract is generated, not hand-written.** FastAPI's OpenAPI schema is committed and
   `openapi-typescript` generates the web app's types; CI fails if either is stale.
 - **Local Docker via Colima.** It only affects local development: Vercel, Hugging Face Spaces and

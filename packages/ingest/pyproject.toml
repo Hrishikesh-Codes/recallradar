@@ -1,0 +1,13 @@
+[project]
+name = "recallradar-ingest"
+version = "0.1.0"
+description = "Recall source ingesters (CPSC, openFDA, FSIS, NHTSA), normalization, and text extraction."
+requires-python = ">=3.12,<3.13"
+dependencies = ["recallradar-core"]
+
+[tool.uv.sources]
+recallradar-core = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"

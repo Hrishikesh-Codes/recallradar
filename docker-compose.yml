@@ -1,0 +1,57 @@
+# Local development stack. The web app runs on the host (`make web`) for fast reloads.
+#   make up      start db + mailpit + api
+#   make down    stop everything (data persists in the db-data volume)
+name: recallradar
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: recallradar
+      POSTGRES_PASSWORD: recallradar
+      POSTGRES_DB: recallradar
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recallradar -d recallradar"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Catches outgoing email (magic links, alerts) locally. Inbox UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      ENVIRONMENT: local
+      DATABASE_URL: postgresql+psycopg://recallradar:recallradar@db:5432/recallradar
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "${API_PORT:-8000}:7860"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/readyz')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    command: >
+      sh -c "alembic -c packages/core/alembic.ini upgrade head &&
+             exec uvicorn recallradar_api.main:create_app --factory --host 0.0.0.0 --port 7860
+             --reload --reload-dir apps/api/src --reload-dir packages"
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./packages:/app/packages
+
+volumes:
+  db-data:

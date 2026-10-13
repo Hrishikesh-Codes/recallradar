@@ -1,0 +1,450 @@
+@import "tailwindcss";
+
+/*
+ * RecallRadar design system. Values come from src/design/tokens.ts (tests keep the colours in
+ * sync) and from measurements of the reference site — see docs/DESIGN.md.
+ */
+
+@theme {
+  /* Only our palette exists; Tailwind's default colours are removed on purpose. */
+  --color-*: initial;
+  --color-bg-0: #010001;
+  --color-bg-1: #161210;
+  --color-line: #312c21;
+  --color-muted-3: #5e594a;
+  --color-muted-2: #959180;
+  --color-muted-1: #bbb8ab;
+  --color-khaki: #cdc9b5;
+  --color-text: #eeeadc;
+  --color-accent: #ff9d00;
+  --color-accent-deep: #e34608;
+  --color-transparent: transparent;
+
+  /* Reference breakpoints: 768 / 940 / 1100 / 1200 / 1440. */
+  --breakpoint-*: initial;
+  --breakpoint-sm: 48rem;
+  --breakpoint-md: 58.75rem;
+  --breakpoint-lg: 68.75rem;
+  --breakpoint-xl: 75rem;
+  --breakpoint-2xl: 90rem;
+
+  --font-weight-book: 450;
+
+  /* Display: 56px at 375w -> 164px at 1440w, measured. */
+  --text-hero: clamp(3.5rem, 1.123rem + 10.141vw, 10.25rem);
+  --text-hero--line-height: 0.9;
+  --text-hero--letter-spacing: -0.03em;
+  --text-display: clamp(2.25rem, 1.106rem + 4.883vw, 5.5rem);
+  --text-display--line-height: 0.9;
+  --text-display--letter-spacing: -0.027em;
+  --text-verdict: clamp(3rem, 1.5rem + 6.4vw, 7.5rem);
+  --text-verdict--line-height: 0.9;
+  --text-verdict--letter-spacing: -0.03em;
+  /* Text face. */
+  --text-heading: clamp(1.375rem, 1.155rem + 0.939vw, 2rem);
+  --text-heading--line-height: 1.2;
+  --text-heading--letter-spacing: -0.02em;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5;
+  --text-body--letter-spacing: -0.01em;
+  --text-caption: clamp(0.75rem, 0.715rem + 0.15vw, 0.85rem);
+  --text-caption--line-height: 1.4;
+  --text-caption--letter-spacing: 0.0075rem;
+  /* Display face, uppercase UI labels. */
+  --text-label: 0.9375rem;
+  --text-label--line-height: 1.1;
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 1rem;
+
+  --shadow-float: 0 10px 30px rgb(0 0 2 / 0.3);
+
+  --ease-reveal: cubic-bezier(0.5, 0.1, 0, 1);
+}
+
+@theme inline {
+  --font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-text-face), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --dur-hover: 150ms;
+  --dur-overlay: 250ms;
+  --dur-reveal: 500ms;
+  /* 16-column grid, measured: gutters 0.5 -> 1rem, side margins 1.5 -> 7.5rem. */
+  --gutter: clamp(0.5rem, 0.324rem + 0.751vw, 1rem);
+  --margin: clamp(1.5rem, -0.613rem + 9.014vw, 7.5rem);
+  --nav-height: 4.5rem;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-bg-0);
+    color: var(--color-text);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--color-bg-0);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    font-weight: var(--font-weight-book);
+    line-height: var(--text-body--line-height);
+    letter-spacing: var(--text-body--letter-spacing);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-bg-0);
+  }
+}
+
+@layer components {
+  .page-x {
+    padding-inline: var(--margin);
+  }
+
+  /* Uppercase display-face type. */
+  .display {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-book);
+    text-transform: uppercase;
+  }
+
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: var(--text-eyebrow);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  /* Floating controls: nav pills, menu panel. */
+  .glass {
+    background-color: rgb(1 0 1 / 0.4);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border-radius: var(--radius-md);
+  }
+
+  /* Card within a card: hairline outer frame, 4px gap, dashed inner frame. */
+  .card {
+    position: relative;
+    padding: 0.25rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background-color: rgb(49 44 33 / 0.3);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  .card--floating {
+    box-shadow: var(--shadow-float);
+  }
+
+  .card__inner {
+    height: 100%;
+    padding: 1rem;
+    border: 1px dashed var(--color-line);
+    border-radius: var(--radius-sm);
+  }
+
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass {
+      background-color: rgb(22 18 16 / 0.96);
+    }
+
+    .card {
+      background-color: var(--color-bg-1);
+    }
+  }
+
+  /* Nested frame with dot-grid corner ornaments (footer style). */
+  .frame {
+    position: relative;
+    padding: 1rem;
+  }
+
+  .frame::after {
+    content: "";
+    position: absolute;
+    inset: 1rem;
+    border-radius: var(--radius-md);
+    background-color: rgb(49 44 33 / 0.1);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+    pointer-events: none;
+  }
+
+  .frame__corner {
+    position: absolute;
+    color: var(--color-muted-1);
+    pointer-events: none;
+  }
+
+  .frame__panel {
+    border-radius: var(--radius-md);
+    background-color: rgb(49 44 33 / 0.1);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+
+  /* Buttons. The hover fill wipes up from the bottom, as on the reference. */
+  .btn {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 1.067em 1.6em;
+    overflow: clip;
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-family: var(--font-display);
+    font-size: var(--text-label);
+    font-weight: 600;
+    line-height: var(--text-label--line-height);
+    letter-spacing: normal;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+    transition: color var(--dur-hover) linear;
+  }
+
+  .btn__bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+  }
+
+  .btn__bg--rest {
+    background-color: color-mix(in srgb, var(--color-line) 20%, transparent);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+    transition: box-shadow var(--dur-hover) linear;
+  }
+
+  .btn__bg--hover {
+    background-color: var(--color-accent-deep);
+    clip-path: inset(100% 0 0 0);
+    transition: clip-path var(--dur-overlay) var(--ease-reveal);
+  }
+
+  .btn--outline {
+    -webkit-backdrop-filter: blur(17px);
+    backdrop-filter: blur(17px);
+  }
+
+  .btn--primary {
+    color: var(--color-bg-0);
+  }
+
+  .btn--primary .btn__bg--rest {
+    background-color: var(--color-accent);
+    box-shadow: none;
+  }
+
+  .btn__icon {
+    position: relative;
+    display: inline-flex;
+    overflow: clip;
+  }
+
+  .btn__arrow {
+    display: block;
+    width: 0.8em;
+    height: 0.8em;
+    transition: transform var(--dur-overlay) var(--ease-reveal);
+  }
+
+  .btn__arrow--next {
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%);
+  }
+
+  @media (hover: hover) {
+    .btn:hover {
+      color: var(--color-bg-0);
+    }
+
+    .btn:hover .btn__bg--rest {
+      box-shadow: inset 0 0 0 1px var(--color-muted-3);
+    }
+
+    .btn:hover .btn__bg--hover {
+      clip-path: inset(0 0 0 0);
+    }
+
+    .btn:hover .btn__arrow--current {
+      transform: translateX(120%);
+    }
+
+    .btn:hover .btn__arrow--next {
+      transform: translateX(0);
+    }
+  }
+
+  .btn:active .btn__bg--hover {
+    clip-path: inset(0 0 0 0);
+  }
+
+  .btn:active {
+    color: var(--color-bg-0);
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.33;
+    pointer-events: none;
+  }
+
+  /* Text link: display face, arrow, underline that fills with orange on hover. */
+  .text-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding-block: 0.8em;
+    color: var(--color-text);
+    font-family: var(--font-display);
+    font-size: var(--text-label);
+    font-weight: 600;
+    line-height: var(--text-label--line-height);
+    text-transform: uppercase;
+  }
+
+  .text-link::after,
+  .text-link::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 1px;
+  }
+
+  .text-link::after {
+    background-color: currentColor;
+  }
+
+  .text-link::before {
+    z-index: 1;
+    background-color: var(--color-accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--dur-overlay) var(--ease-reveal);
+  }
+
+  .text-link:hover::before,
+  .text-link:focus-visible::before {
+    transform: scaleX(1);
+  }
+
+  /* Form fields: the border must reach 3:1 against the page (WCAG 1.4.11): muted-2, not line. */
+  .field {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-muted-2);
+    border-radius: var(--radius-sm);
+    background-color: rgb(22 18 16 / 0.6);
+    color: var(--color-text);
+    font: inherit;
+    transition: border-color var(--dur-hover) linear;
+  }
+
+  .field::placeholder {
+    color: var(--color-muted-2);
+  }
+
+  .field:hover {
+    border-color: var(--color-khaki);
+  }
+
+  .field:focus-visible {
+    border-color: var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+    font-family: var(--font-display);
+    font-size: var(--text-eyebrow);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  /* Masked line reveal. Lines are visible unless JS armed them while offscreen. */
+  .reveal-line {
+    display: block;
+    overflow: clip;
+    /* Room for descenders below the 0.9 line-height. */
+    padding-bottom: 0.06em;
+    margin-bottom: -0.06em;
+  }
+
+  .reveal-line__inner {
+    display: block;
+    transition: transform var(--dur-reveal) var(--ease-reveal);
+    transition-delay: calc(var(--line-index, 0) * 80ms);
+  }
+
+  [data-reveal="armed"] .reveal-line__inner {
+    transform: translateY(105%);
+    transition: none;
+  }
+
+  [data-reveal="on-load"] .reveal-line__inner {
+    animation: reveal-line-up var(--dur-reveal) var(--ease-reveal) both;
+    animation-delay: calc(150ms + var(--line-index, 0) * 80ms);
+  }
+}
+
+@keyframes reveal-line-up {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /*
+   * No transitions at all. (The common "0.01ms" trick makes every element transition every
+   * property, including inherited visibility, which briefly hides menus from focus.)
+   */
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-reveal="armed"] .reveal-line__inner {
+    transform: none;
+  }
+
+  [data-reveal="on-load"] .reveal-line__inner {
+    animation: none;
+  }
+}

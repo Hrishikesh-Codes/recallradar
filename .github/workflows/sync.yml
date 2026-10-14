@@ -1,0 +1,61 @@
+name: Sync recalls and send alerts
+
+# Daily: pull new and updated recalls from CPSC and openFDA, embed new products, re-check every
+# watched item, and email users about new CPSC matches. Also run by hand from the Actions tab.
+on:
+  schedule:
+    - cron: "17 9 * * *" # 09:17 UTC daily (CPSC and FDA publish on US business days)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "incremental, or backfill (everything since 2015)"
+        default: incremental
+        type: choice
+        options: [incremental, backfill]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENVIRONMENT: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENFDA_API_KEY: ${{ secrets.OPENFDA_API_KEY }}
+      SMTP_URL: ${{ secrets.SMTP_URL }}
+      MAIL_FROM: ${{ vars.MAIL_FROM }}
+      WEB_URL: ${{ vars.WEB_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - run: uv sync --package recallradar-jobs --frozen --no-dev
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/recallradar/models
+          key: embedding-model-bge-small-en-v1.5
+      - name: Migrate
+        run: uv run alembic -c packages/core/alembic.ini upgrade head
+      - name: Sync sources
+        id: sync
+        # One failing source (CPSC's service has outages) shouldn't stop the others' alerts.
+        continue-on-error: true
+        run: uv run recallradar-sync --source all --mode "${{ inputs.mode || 'incremental' }}"
+      - name: Embed new products
+        run: uv run recallradar-embed
+      - name: Re-check watched items and send alerts
+        run: uv run recallradar-alerts
+      - name: Wake the API (Hugging Face Spaces sleep after two idle days)
+        if: vars.API_URL != ''
+        run: curl -fsS --max-time 120 "${{ vars.API_URL }}/healthz" || true
+      - name: Fail the run if a source failed to sync
+        if: steps.sync.outcome == 'failure'
+        run: exit 1

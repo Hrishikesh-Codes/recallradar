@@ -83,6 +83,156 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Me */
+    get: operations["me_v1_me_get"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete Account
+     * @description Delete the account and everything derived from it: sessions, list, matches, alerts.
+     */
+    delete: operations["delete_account_v1_me_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/demo": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Seed Demo
+     * @description Fill a new demo (anonymous) account's list with real examples of every verdict.
+     */
+    post: operations["seed_demo_v1_me_demo_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Export */
+    get: operations["export_v1_me_export_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/items": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Items */
+    get: operations["list_items_v1_me_items_get"];
+    put?: never;
+    /**
+     * Add Item
+     * @description Save a product to the list. It's checked now, then again whenever new recalls arrive.
+     */
+    post: operations["add_item_v1_me_items_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/items/{item_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove Item */
+    delete: operations["remove_item_v1_me_items__item_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/items/{item_id}/matches/{recall_id}/dismiss": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Dismiss Match
+     * @description "Not my product": this recall stops counting for the item, and stays dismissed.
+     */
+    post: operations["dismiss_match_v1_me_items__item_id__matches__recall_id__dismiss_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/items/{item_id}/matches/{recall_id}/restore": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restore Match */
+    post: operations["restore_match_v1_me_items__item_id__matches__recall_id__restore_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Settings */
+    put: operations["update_settings_v1_me_settings_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/meta": {
     parameters: {
       query?: never;
@@ -206,6 +356,28 @@ export interface components {
      * @enum {string}
      */
     Environment: "local" | "test" | "production";
+    /**
+     * Export
+     * @description Everything we hold about a user (SPEC §11: full data export).
+     */
+    Export: {
+      /** Account */
+      account: {
+        [key: string]: unknown;
+      };
+      /** Alerts */
+      alerts: {
+        [key: string]: unknown;
+      }[];
+      /**
+       * Exported At
+       * Format: date-time
+       */
+      exported_at: string;
+      /** Items */
+      items: components["schemas"]["ItemOut"][];
+      settings: components["schemas"]["SettingsOut"];
+    };
     /** FeedbackRequest */
     FeedbackRequest: {
       /**
@@ -228,6 +400,49 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
+    };
+    /** ItemMatchOut */
+    ItemMatchOut: {
+      /** Dismissed */
+      dismissed: boolean;
+      /**
+       * First Matched At
+       * Format: date-time
+       */
+      first_matched_at: string;
+      /** Reasons */
+      reasons: string[];
+      recall: components["schemas"]["RecallSummary"];
+      tier: components["schemas"]["Tier"];
+    };
+    /** ItemOut */
+    ItemOut: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Id */
+      id: number;
+      /**
+       * Input Type
+       * @enum {string}
+       */
+      input_type: "text" | "link" | "barcode";
+      /** Input Value */
+      input_value: string;
+      /** Label */
+      label: string;
+      /**
+       * Last Checked At
+       * Format: date-time
+       */
+      last_checked_at: string;
+      /** Matches */
+      matches: components["schemas"]["ItemMatchOut"][];
+      /** Purchase Date */
+      purchase_date: string | null;
+      verdict: components["schemas"]["Tier"];
     };
     /** Liveness */
     Liveness: {
@@ -253,11 +468,34 @@ export interface components {
       /** What To Check */
       what_to_check: string[];
     };
+    /** Me */
+    Me: {
+      /**
+       * Email
+       * @description null for demo (anonymous) accounts
+       */
+      email: string | null;
+      /** Id */
+      id: string;
+      /** Is Anonymous */
+      is_anonymous: boolean;
+      /** Items */
+      items: number;
+      settings: components["schemas"]["SettingsOut"];
+    };
     /** Meta */
     Meta: {
       environment: components["schemas"]["Environment"];
       /** Version */
       version: string;
+    };
+    /** NewItem */
+    NewItem: {
+      input: components["schemas"]["CheckInput"];
+      /** Label */
+      label?: string | null;
+      /** Purchase Date */
+      purchase_date?: string | null;
     };
     /**
      * NoticeType
@@ -388,6 +626,13 @@ export interface components {
       detail: string;
       /** Kind */
       kind: string;
+    };
+    /** SettingsOut */
+    SettingsOut: {
+      /** Alert Tiers */
+      alert_tiers: ("recalled" | "check_unit")[];
+      /** Email Alerts */
+      email_alerts: boolean;
     };
     /** SourceCoverage */
     SourceCoverage: {
@@ -570,6 +815,328 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  me_v1_me_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Me"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_account_v1_me_delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  seed_demo_v1_me_demo_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ItemOut"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_v1_me_export_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Export"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_items_v1_me_items_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ItemOut"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_item_v1_me_items_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NewItem"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ItemOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remove_item_v1_me_items__item_id__delete: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path: {
+        item_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  dismiss_match_v1_me_items__item_id__matches__recall_id__dismiss_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path: {
+        item_id: number;
+        recall_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ItemOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  restore_match_v1_me_items__item_id__matches__recall_id__restore_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path: {
+        item_id: number;
+        recall_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ItemOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_settings_v1_me_settings_put: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SettingsOut"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SettingsOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };

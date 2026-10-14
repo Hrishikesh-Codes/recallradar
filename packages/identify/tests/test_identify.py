@@ -144,3 +144,12 @@ class TestBarcode:
             )
         )
         assert barcode.lookup_open_food_facts(client, "00036000291452") is None
+
+
+def test_link_slug_keeps_hyphenated_model_numbers() -> None:
+    query = link.parse_link(
+        "https://www.homedepot.com/p/Cuisinart-Propel-Four-Burner-3-in-1-Gas-Grill-CGG-6331/000000000"
+    )
+    assert "CGG-6331" in query.model_numbers
+    # Word pairs like "in-1" or "Size-10" aren't models.
+    assert not any(m.startswith(("IN-", "SIZE-")) for m in query.model_numbers)

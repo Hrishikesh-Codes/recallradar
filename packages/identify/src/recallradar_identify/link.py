@@ -11,6 +11,7 @@ from urllib.parse import unquote, urlsplit
 
 from recallradar_identify.query import InputType, ProductQuery
 from recallradar_identify.text import parse_text
+from recallradar_ingest.extract import codes
 
 SHORT_LINK_HOSTS = frozenset(
     {"a.co", "amzn.to", "amzn.eu", "amzn.asia", "bit.ly", "tinyurl.com", "goo.gl", "ebay.us",
@@ -92,6 +93,16 @@ _RETAILERS = [
 ]
 
 
+# In a slug, hyphens separate words and also sit inside model numbers ("...-Gas-Grill-CGG-6331"):
+# a short letter group followed by a number group is rejoined as a model candidate.
+_SLUG_MODEL = re.compile(r"(?<![A-Za-z0-9])([A-Za-z]{2,5})-(\d{3,6}[A-Za-z]{0,2})(?![A-Za-z0-9])")
+
+
+def _slug_models(slug: str) -> list[str]:
+    found = (f"{letters}-{digits}" for letters, digits in _SLUG_MODEL.findall(unquote(slug)))
+    return [m.upper() for m in found if codes.is_code_like(m, kind=codes.CodeKind.MODEL)]
+
+
 def _slug_to_name(slug: str) -> str:
     words = re.split(r"[-_+]+", unquote(slug))
     return " ".join(w for w in words if w and not re.fullmatch(r"ref=.*", w, re.I))
@@ -138,6 +149,9 @@ def parse_link(url: str) -> ProductQuery:
         )
 
     query = parse_text(name)
+    for model in _slug_models(slug or ""):
+        if model not in query.model_numbers:
+            query.model_numbers.append(model)
     query.input_type = InputType.LINK
     query.raw = raw[:2000]
     query.retailer = retailer.name if retailer else host or None

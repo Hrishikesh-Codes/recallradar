@@ -3,6 +3,143 @@
 A short log of design decisions and why. Newest milestone first; each entry says what was decided,
 why, and what it costs.
 
+## M1 — Thin slice (2026-10-13 to 10-14)
+
+### Recall data
+
+- **Sources: CPSC and openFDA (food, drugs, devices), every recall reported since 2015-01-01.**
+  25,856 recalls and 75,176 products: CPSC 3,710 recalls (one product each); FDA food 6,353 recalls
+  / 23,198 products, drugs 3,824 / 14,637, devices 11,969 / 33,631. openFDA has one record per
+  product and a recall is its `event_id`; FDA recall dates can precede 2015 because the window is
+  on the enforcement report date.
+- **Every field and quirk was checked against real responses first** (`tests/fixtures`, with the
+  URL and fetch time of each in `manifest.json`):
+  - CPSC has no paging, so backfills go a year at a time. A misspelled parameter is silently
+    ignored and returns the whole database, so parameter names are checked against the
+    documented list and oversized answers are rejected. Its `Model` field is always empty since
+    2015; model numbers are extracted from the description.
+  - openFDA pages with `search_after` (`skip` stops at 26,000). OR queries need the grouped form
+    `field:("A" "B")`. A 404 means "no results".
+- **CPSC's error placeholder is never stored.** When its database fails, CPSC answers HTTP 200
+  with one fake record (`RecallID` 0, title "Error retrieving Recalls: The underlying provider
+  failed on Open."). The first re-sync stored one before this was caught. It also seems to cache
+  that answer per URL: `2020-01-01..2020-01-12` kept failing for hours while `..01-10` and
+  `01-02..` worked, and single days worked. So a failed window is retried with its end moved a day
+  later each time (a new URL; overlaps are harmless because upserts are idempotent), then split
+  at a random point. If it still fails, the sync run is recorded as failed instead of storing
+  junk. Real response saved as `tests/fixtures/cpsc/provider_error.json`.
+- **Extraction coverage** (share of products with each field, measured on the full backfill):
+
+  | Source | UPC | Model | Lot | Restricted to some units | Brand |
+  |---|---|---|---|---|---|
+  | CPSC | 7% | 48% | 4% | 34% | 100% |
+  | FDA food | 41% | 6% | 35% | 94% | 14% |
+  | FDA drugs | 20% | 2% | 71% | 90% | 43% |
+  | FDA devices | 44% | 78% | 48% | 97% | 0% |
+
+  "Restricted" means the recall covers only some lots, dates or serials, so an identifier match
+  is *Check your unit*, not *Recalled*. A sentence that only says where a serial number is
+  printed no longer counts as a restriction (CPSC 10853, Cuisinart CGG-6331, covers every unit).
+  FDA brands come from openFDA's `brand_name` or the label's "Distributed by"/"Manufactured for"
+  company ("Distributed by: EzriCare, LLC").
+- **A full backfill takes about 2.5 minutes of fetching** (CPSC's per-year requests are the slow
+  part) with peak memory around 310 MB.
+- **Changed products keep their embedding** unless the embedded text (name, brand, category)
+  changed. A re-sync after an extraction fix then costs seconds instead of a 26-minute re-embed.
+
+### Storage (Neon free plan: 1 GB per project)
+
+- Neon's free plan is **1 GB per project** (neon.com/pricing, checked 2026-10-13); M0 planned for
+  0.5 GB, the older limit.
+- Measured on the full backfill with every product embedded, after `VACUUM FULL`: **427 MB**
+  (products 370 MB, of which the HNSW index is 83 MB; recalls 48 MB). Straight after embedding it
+  was 489 MB, because every embedding is an UPDATE that leaves a dead row, so production is seeded
+  by restoring a dump rather than embedding in place. That leaves over half the plan for M4's
+  passages and for growth.
+- Compaction that paid off: no duplicate of the product name in raw FDA records, raw `code_info`
+  capped at 2,000 characters (the full text is still parsed), at most 300 codes per product, and
+  a trigram index on the first 200 characters of names only.
+
+### Embeddings and vector search
+
+- **`BAAI/bge-small-en-v1.5` through fastembed (ONNX), not sentence-transformers.** Same model,
+  no PyTorch: the API image is 1.14 GB with the model baked in and idles at 191 MiB of memory.
+- **Embedding all 75,176 products took 25.6 minutes on an M-series Mac** (49 products/s, batch
+  512, peak 2.2 GB). Daily syncs add a few hundred products at most.
+- **HNSW on `halfvec(384)`, `m=16, ef_construction=64`, queried with `ef_search=400`.** Against
+  exact search on 80 queries (60 real product names, 20 typed descriptions): recall@50 0.988, and
+  0.995 for neighbours with cosine ≥ 0.70 (the only ones the matcher uses), at 1.9 ms median.
+  At `ef_search=100` recall@50 was 0.926 and one query got 0.20; at 200 it was 0.970. The higher
+  setting costs nothing noticeable at this size.
+- **Binary-quantised HNSW was rejected:** a 25 MB index instead of 83 MB, but recall@50 was only
+  0.846 even when re-ranking 400 candidates.
+
+### Matching (baseline, rules only)
+
+- **Candidates** come from four retrievers merged with reciprocal-rank fusion: exact identifiers
+  (UPC, model, weak table codes), full-text search, trigram similarity on name prefixes, and
+  vector search.
+- **Tiers follow the approved rules.** *Recalled* needs a UPC match, or a model number plus the
+  brand, on a recall without unresolved unit restrictions. Everything weaker is *Check your unit*.
+- **Brand evidence must be rare.** A word counts as the brand only if few recalled products
+  mention it (≤ 500; ≤ 100 when it is just the first word of a product name). "Graco" is in 3
+  products, "Multi" in over 1,000. Compound names match ("Ninja" in "SharkNinja").
+- **Same brand isn't enough for a "family" match.** When the query and the recall both name a
+  product line beyond the brand and the lines differ ("Rock 'n Play" vs "Infant Motion Seats"),
+  only a near-identical name (cosine ≥ 0.88) still matches. The recall headline's product phrase
+  counts as part of the recall's line ("IKEA Recalls 29 Million MALM ... Dressers").
+- **A model the user gave that the recall doesn't list argues against a match** ("Peloton PL01"
+  is not the "Bike+ PL02" recall). Listed series count ("WA50B" covers "WA50B5100AW"), and so do
+  codes in the product name ("PR70P Clip-In Pedals").
+- **Name-only matches don't decide verdicts for categories we don't cover yet.** A car seat
+  matched by name to a CPSC rocking seat stays *Can't check yet*; only an identifier match would
+  count.
+- **Thresholds are hand-set** (cosine 0.80 for a family match, 0.76 for safety-critical
+  categories, 0.88 when product lines differ) and replaced by calibrated ones in M3.
+- **The M1 smoke set is a tuning set, not an accuracy claim.** `data/labels/m1_smoke.jsonl` has 53
+  hand-labelled real inputs (recalled, check-unit, hard negatives, out-of-scope, vague) plus
+  recalls that must *not* be listed. The first run scored 44/53; fixes guided by it bring it to
+  53/53, with 35 ms median latency locally. Because the rules were tuned on it, that score says
+  nothing about unseen products; M3's labelled test set will.
+
+### Accounts, privacy, and alerts
+
+- **Better Auth's tables are created by Alembic**, with snake_case columns mapped field by field
+  in `apps/web/src/lib/auth.ts`, so one migration system owns the schema.
+- **Magic links are stored hashed** and expire in 15 minutes; **session IP tracking is off.**
+- **"Try the demo" signs you in to a private anonymous account** (Better Auth's anonymous plugin)
+  with six real examples covering every verdict. Signing in with an email moves the list to the
+  real account. Demo accounts never get email and are deleted after 7 days by the daily job.
+- **Signed-in calls go through the Next.js server**, which signs a 2-minute HS256 token for the
+  API. The browser never holds it, and the API only trusts it for a user that still exists.
+- **Anonymous checks call the API directly** and are rate limited per IP in memory (20/minute,
+  300/day). The free API is a single instance, so in-process counters are exact.
+- **Checks are not stored.** An event records the input type, verdict, match count and latency,
+  never the product. "Try it now" hands its text to `/check` in session storage, so it never
+  appears in URLs or server logs.
+- **Barcode names come from Open Food Facts, looked up by our server** (users' IPs aren't
+  shared) and cached for 30 days (3 days when not found), within its 15 reads/minute limit.
+- **Email alerts are CPSC-only** (approved). openFDA's terms say its data must not be used to
+  alert the public, so FDA matches appear on the list and are recorded as skipped alerts.
+- **One alert per item, recall and channel,** enforced by a unique constraint. Matches found when
+  an item is saved aren't emailed (the user just saw them). Each run sends at most one email per
+  user. M1 re-checks every watched item after each sync (0.5 s for 6 items here). M3 replaces
+  this with a reverse lookup from new recalls and benchmarks it.
+- **Mail goes out over SMTP**: Mailpit locally, Resend's SMTP in production. One code path for
+  both apps.
+
+### Web
+
+- **Barcode scanning uses the browser's BarcodeDetector where it exists, otherwise ZXing
+  (WebAssembly).** The 1 MB `.wasm` is copied from `node_modules` at build time and served from
+  our own origin, not a CDN. A WebKit Playwright project covers iPhones, which take the ZXing
+  path.
+- **Cache Components patterns:** session reads sit behind `<Suspense>`; the landing page's recall
+  counter is a cached component, so its "updated X ago" is computed when the cache refreshes (a
+  few minutes at most).
+- **Links are read, never fetched.** Hyphenated slugs are scanned for model numbers that the
+  hyphens split ("…-Gas-Grill-CGG-6331").
+
 ## M0 — Foundation (2026-10-13)
 
 ### Approved changes to the spec
@@ -98,5 +235,4 @@ why, and what it costs.
 - **`httpx` → `httpx2`.** Starlette now warns that its test client wants `httpx2`. Adding that new
   dependency was blocked by the permission check, so the tests keep `httpx` for now (a deprecation
   warning, nothing broken). Swap when approved.
-- **WebKit in Playwright.** M0 runs Chromium only (desktop, Pixel 7 emulation, reduced motion). Add
-  a WebKit project in M1, since barcode scanning on iPhone depends on Safari behaviour.
+- ~~**WebKit in Playwright.**~~ Added in M1 (iPhone 15 emulation).

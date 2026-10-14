@@ -31,10 +31,12 @@ export function CheckForm({
   onSubmit,
   disabled = false,
   initialMode = "text",
+  submitLabel = "Check it",
 }: {
   onSubmit: (input: CheckInput) => void;
   disabled?: boolean;
   initialMode?: Mode;
+  submitLabel?: string;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [values, setValues] = useState<Record<Mode, string>>({ text: "", link: "", barcode: "" });
@@ -143,7 +145,7 @@ export function CheckForm({
             disabled={disabled || !values[mode].trim()}
             className="self-start"
           >
-            Check it
+            {submitLabel}
           </Button>
         </form>
       </div>

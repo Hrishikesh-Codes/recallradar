@@ -64,7 +64,9 @@ export function CheckExperience({ recalls }: { recalls?: number }) {
   return (
     <div ref={heading} tabIndex={-1} className="outline-none">
       {state.kind === "checking" ? <Checking recalls={recalls} /> : null}
-      {state.kind === "done" ? <VerdictView result={state.result} onCheckAnother={reset} /> : null}
+      {state.kind === "done" ? (
+        <VerdictView result={state.result} input={state.input} onCheckAnother={reset} />
+      ) : null}
       {state.kind === "idle" || state.kind === "error" ? (
         <div className="flex flex-col gap-12">
           {state.kind === "error" ? (

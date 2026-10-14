@@ -65,3 +65,43 @@ def brand_tokens(names: Iterable[str | None]) -> set[str]:
         company = re.split(r",?\s+of\s+[A-Z]", name or "")[0]
         found |= {t for t in tokens(company) if t not in _CORPORATE and len(t) >= 2}
     return found
+
+
+def stem(token: str) -> str:
+    """Crude plural folding, enough to compare product names: "loungers" -> "lounger"."""
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 4 and token.endswith(("ches", "shes", "sses", "xes", "zes")):
+        return token[:-2]
+    if len(token) > 3 and token.endswith("s") and not token.endswith(("ss", "us", "is")):
+        return token[:-1]
+    return token
+
+
+def stems(words: Iterable[str]) -> set[str]:
+    return {stem(word) for word in words}
+
+
+# "IKEA Recalls 29 Million MALM ... Dressers Due to ..." -> "29 Million MALM ... Dressers";
+# "HALO 1000 Power Stations Recalled Due to ..." -> "HALO 1000 Power Stations".
+_TITLE_VERB = re.compile(
+    r"\b(?:re-?announces\s+recall\s+of|expands\s+recall\s+of|recalls|recalled|warns)\b", re.I
+)
+_TITLE_END = re.compile(r"\b(?:due\s+to|because|after|following)\b|;", re.I)
+_TITLE_STOP = frozenset(
+    "million thousand hundred about approximately nearly more than other certain models model "
+    "additional sold exclusively at".split()
+)
+
+
+def title_product_phrase(title: str) -> str:
+    """The product part of a recall headline, without the firm, hazard, or counts."""
+    verb = _TITLE_VERB.search(title)
+    if verb is None:
+        return title
+    after = title[verb.end() :]
+    end = _TITLE_END.search(after)
+    phrase = after[: end.start()] if end else after
+    if not phrase.strip(" ,:"):  # "X Recalled Due to ...": the product comes first
+        phrase = title[: verb.start()]
+    return " ".join(w for w in phrase.split() if w.lower() not in _TITLE_STOP)

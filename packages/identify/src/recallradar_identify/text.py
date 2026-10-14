@@ -20,7 +20,8 @@ _LOT = re.compile(
 )
 
 
-def _model_tokens(text: str) -> list[str]:
+def model_tokens(text: str) -> list[str]:
+    """Unlabelled tokens that look like model numbers: "IP-DUO60", "PR70P"."""
     found = []
     for token in _MODEL_TOKEN.findall(text):
         if codes.is_code_like(token, kind=codes.CodeKind.MODEL) and not _YEAR.fullmatch(token):
@@ -49,7 +50,7 @@ def parse_text(raw: str) -> ProductQuery:
     barcode_digits = {u.lstrip("0") for u in upcs}
     models = [
         m
-        for m in dict.fromkeys(labelled.models + _model_tokens(text))
+        for m in dict.fromkeys(labelled.models + model_tokens(text))
         if m.lstrip("0") not in barcode_digits
     ]
     lots = list(dict.fromkeys(labelled.lots + _LOT.findall(text)))

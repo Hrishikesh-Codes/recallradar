@@ -35,6 +35,10 @@ services:
       ENVIRONMENT: local
       DATABASE_URL: postgresql+psycopg://recallradar:recallradar@db:5432/recallradar
       CORS_ORIGINS: http://localhost:3000
+      # Same value as apps/web/.env.local; enables the account endpoints.
+      API_TOKEN_SECRET: ${API_TOKEN_SECRET:-}
+      WEB_URL: http://localhost:3000
+      SMTP_URL: smtp://mailpit:1025
     ports:
       - "${API_PORT:-8000}:7860"
     depends_on:

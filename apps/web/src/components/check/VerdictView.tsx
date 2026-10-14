@@ -1,11 +1,12 @@
 "use client";
 
 import { MatchCard } from "@/components/check/MatchCard";
+import { SaveButton } from "@/components/check/SaveButton";
 import { ArrowRightIcon } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { VerdictHeading } from "@/components/ui/VerdictHeading";
-import type { CheckResponse, QueryOut } from "@/lib/api/client";
+import type { CheckInput, CheckResponse, QueryOut } from "@/lib/api/client";
 import { formatCount, listSources, timeAgo } from "@/lib/format";
 
 const NOT_COVERED_NAMES: Record<string, string> = {
@@ -48,9 +49,12 @@ function ReadAs({ query }: { query: QueryOut }) {
 
 export function VerdictView({
   result,
+  input,
   onCheckAnother,
 }: {
   result: CheckResponse;
+  /** What was checked, for "Save to my list". */
+  input?: CheckInput;
   onCheckAnother: () => void;
 }) {
   const uncovered = result.coverage.not_covered.map((s) => NOT_COVERED_NAMES[s] ?? s);
@@ -129,6 +133,7 @@ export function VerdictView({
       ) : null}
 
       <div className="flex flex-wrap gap-3">
+        {input && result.verdict !== "unidentified" ? <SaveButton input={input} /> : null}
         <Button variant="primary" onClick={onCheckAnother}>
           Check another product
         </Button>

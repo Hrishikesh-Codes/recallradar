@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-const PAGES = ["/", "/dev"] as const;
+const PAGES = ["/", "/check", "/sign-in", "/privacy", "/dev"] as const;
 
 async function seriousA11yViolations(page: Page) {
   const results = await new AxeBuilder({ page })
@@ -37,7 +37,7 @@ test("menu opens, is keyboard reachable, and closes with Escape", async ({ page 
   const toggle = page.getByRole("button", { name: "Open menu" });
   await toggle.click();
   const menu = page.getByRole("navigation", { name: "Main" });
-  await expect(menu.getByRole("link", { name: "Design system" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Check a product" })).toBeVisible();
   await expect(menu.getByRole("link").first()).toBeFocused();
 
   await page.keyboard.press("Escape");
@@ -45,19 +45,19 @@ test("menu opens, is keyboard reachable, and closes with Escape", async ({ page 
   await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused();
 });
 
-test("menu navigates to the design system", async ({ page }) => {
+test("menu navigates to the check page", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open menu" }).click();
   await page
     .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: "Design system" })
+    .getByRole("link", { name: "Check a product" })
     .click();
-  await expect(page).toHaveURL(/\/dev$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Tokens and components/i);
+  await expect(page).toHaveURL(/\/check$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Is it recalled\?/i);
 });
 
 test("skip link jumps to the main content", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name === "mobile", "keyboard-only flow");
+  test.skip(["mobile", "iphone"].includes(testInfo.project.name), "keyboard-only flow");
   await page.goto("/");
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "Skip to content" });

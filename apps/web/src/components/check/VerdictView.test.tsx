@@ -2,6 +2,9 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { VerdictView } from "@/components/check/VerdictView";
+
+// The Server Action module talks to the database; the view only needs it to exist.
+vi.mock("@/app/list/actions", () => ({ saveItem: vi.fn() }));
 import type { CheckResponse, MatchOut } from "@/lib/api/client";
 
 const match: MatchOut = {

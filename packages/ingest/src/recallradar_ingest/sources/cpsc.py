@@ -7,11 +7,15 @@ Official guide: "Recall Retrieval Web Services Programmer's Guide", v1.4 (2018-0
 - Since 2015, every record has exactly one `Products` entry, its `Model` field is always empty,
   and only 6% list `ProductUPCs`; model numbers live in the free-text `Description`.
 - When its database fails, the service still answers HTTP 200, with a single placeholder record
-  (`RecallID` 0, `Title` "Error retrieving Recalls: ..."). Such a response is retried, then the
-  window is split in half; it is never stored.
+  (`RecallID` 0, `Title` "Error retrieving Recalls: ..."). It also appears to cache that answer
+  per URL: the same window kept failing for hours while windows a day longer or shorter worked.
+  So a failed window is retried with a different URL (its end moved a day later; overlaps are
+  harmless because upserts are idempotent), then split at a random point. Placeholders are never
+  stored.
 """
 
 import logging
+import random
 import re
 import time
 from collections.abc import Iterator
@@ -72,6 +76,7 @@ MIN_SPLIT_DAYS = 14
 
 
 _sleep = time.sleep  # replaced in tests
+_random = random.Random()  # noqa: S311 - split points, not secrets
 
 
 class SuspiciousResponseError(RuntimeError):
@@ -90,15 +95,16 @@ def is_provider_error(records: list[dict[str, Any]]) -> bool:
 
 
 def _get_window(client: httpx.Client, prefix: str, start: date, end: date) -> list[dict[str, Any]]:
-    params = {
-        "format": "json",
-        f"{prefix}Start": start.isoformat(),
-        f"{prefix}End": end.isoformat(),
-    }
-    unknown = set(params) - DOCUMENTED_PARAMETERS
-    if unknown:  # pragma: no cover - guards future edits
-        raise ValueError(f"undocumented CPSC parameters {unknown}")
     for attempt in range(1, PROVIDER_ERROR_ATTEMPTS + 1):
+        # A new URL each attempt: CPSC seems to serve a cached error for a URL that failed.
+        params = {
+            "format": "json",
+            f"{prefix}Start": start.isoformat(),
+            f"{prefix}End": (end + timedelta(days=attempt - 1)).isoformat(),
+        }
+        unknown = set(params) - DOCUMENTED_PARAMETERS
+        if unknown:  # pragma: no cover - guards future edits
+            raise ValueError(f"undocumented CPSC parameters {unknown}")
         records = get_json(client, URL, params)
         if not isinstance(records, list):
             raise SuspiciousResponseError(f"expected a list, got {type(records).__name__}")
@@ -109,9 +115,10 @@ def _get_window(client: httpx.Client, prefix: str, start: date, end: date) -> li
         logger.warning("cpsc provider error", extra={"params": params, "attempt": attempt})
         if attempt < PROVIDER_ERROR_ATTEMPTS:
             _sleep(PROVIDER_ERROR_BACKOFF_S * attempt)
-    if (end - start).days < MIN_SPLIT_DAYS:
-        raise ProviderError(f"CPSC kept failing for {params}")
-    middle = start + (end - start) / 2
+    days = (end - start).days
+    if days < MIN_SPLIT_DAYS:
+        raise ProviderError(f"CPSC kept failing for {start}..{end}")
+    middle = start + timedelta(days=_random.randint(days // 3, 2 * days // 3))
     return _get_window(client, prefix, start, middle) + _get_window(
         client, prefix, middle + timedelta(days=1), end
     )

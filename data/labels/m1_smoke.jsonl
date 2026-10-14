@@ -1,8 +1,8 @@
-{"id": "anker-a1263", "type": "text", "input": "Anker PowerCore 10000 power bank model A1263", "verdict": "check_unit", "recalls": ["cpsc:10311"], "why": "Model matches; only qualifying serial numbers are recalled."}
+{"id": "anker-a1263", "type": "text", "input": "Anker PowerCore 10000 power bank model A1263", "verdict": "check_unit", "recalls": ["cpsc:10311"], "why": "Model matches; only qualifying serial numbers are recalled. Other Anker models (A1642..., A1366) must not match.", "not_recalls": ["cpsc:10067", "cpsc:9557"]}
 {"id": "cuisinart-cgg6331", "type": "text", "input": "Cuisinart Propel+ gas grill CGG-6331", "verdict": "recalled", "recalls": ["cpsc:10853"], "why": "Model and brand match; every unit is recalled."}
-{"id": "peloton-pl01", "type": "text", "input": "Peloton bike PL01", "verdict": "recalled", "recalls": ["cpsc:9621"], "why": "All PL01 bikes are recalled."}
+{"id": "peloton-pl01", "type": "text", "input": "Peloton bike PL01", "verdict": "recalled", "recalls": ["cpsc:9621"], "why": "All PL01 bikes are recalled. Sibling models PL02 (Bike+) and PR70P pedals must not match.", "not_recalls": ["cpsc:10467", "cpsc:8919"]}
 {"id": "peloton-pl02", "type": "text", "input": "Peloton Bike+ PL02", "verdict": "check_unit", "recalls": ["cpsc:10467"], "why": "Only serial numbers beginning with T."}
-{"id": "rock-n-play", "type": "text", "input": "Fisher-Price Rock 'n Play sleeper", "verdict": "check_unit", "recalls": ["cpsc:8532", "cpsc:9494"], "why": "Name and brand match; no identifier given."}
+{"id": "rock-n-play", "type": "text", "input": "Fisher-Price Rock 'n Play sleeper", "verdict": "check_unit", "recalls": ["cpsc:8532", "cpsc:9494"], "why": "Name and brand match; no identifier given. Other Fisher-Price products (motion seats, sleeper accessory) must not match.", "not_recalls": ["cpsc:8162", "cpsc:8592"]}
 {"id": "ninja-op301", "type": "text", "input": "Ninja Foodi pressure cooker OP301", "verdict": "recalled", "recalls": ["cpsc:10257"], "why": "Ninja is SharkNinja's brand; model OP301 is listed; all units."}
 {"id": "lg-86uq8000aub", "type": "text", "input": "LG 86 inch TV 86UQ8000AUB", "verdict": "check_unit", "recalls": ["cpsc:9498"], "why": "Only serials beginning 202RM-208RM."}
 {"id": "samsung-wa50b5100aw", "type": "text", "input": "Samsung top load washer WA50B5100AW", "verdict": "check_unit", "recalls": ["cpsc:9486"], "why": "Serial ranges per model."}
@@ -23,7 +23,7 @@
 {"id": "link-mamaroo", "type": "link", "input": "https://www.target.com/p/4moms-mamaroo-multi-motion-baby-swing/-/A-00000000", "verdict": "check_unit", "recalls": ["cpsc:9372"], "why": "Constructed link in Target's format."}
 {"id": "link-cuisinart", "type": "link", "input": "https://www.homedepot.com/p/Cuisinart-Propel-Four-Burner-3-in-1-Gas-Grill-CGG-6331/000000000", "verdict": "recalled", "recalls": ["cpsc:10853"], "why": "Constructed link in Home Depot's format; model in slug."}
 {"id": "link-short", "type": "link", "input": "https://a.co/d/abc1234", "verdict": "unidentified", "recalls": [], "why": "Short links can't be read without visiting the page."}
-{"id": "upc-shakespeares-pizza", "type": "barcode", "input": "686148007370", "verdict": "recalled", "recalls": ["fda_food:93568"], "why": "UPC listed; all lots."}
+{"id": "upc-shakespeares-pizza", "type": "barcode", "input": "686148007370", "verdict": "recalled", "recalls": ["fda_food:93568"], "why": "UPC listed; all lots. Another firm's pizza must not match.", "not_recalls": ["fda_food:81267"]}
 {"id": "upc-zenshi-sushi", "type": "barcode", "input": "023012942601", "verdict": "recalled", "recalls": ["fda_food:97019"], "why": "UPC listed; all lots."}
 {"id": "upc-valley-springs", "type": "barcode", "input": "031193013010", "verdict": "recalled", "recalls": ["fda_food:98410"], "why": "UPC listed; all codes."}
 {"id": "upc-earache-drops", "type": "barcode", "input": "311917217123", "verdict": "check_unit", "recalls": ["fda_drug:90297"], "why": "One lot only."}

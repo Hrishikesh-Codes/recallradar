@@ -140,3 +140,55 @@ class FeedbackRequest(BaseModel):
 
 class Accepted(BaseModel):
     status: Literal["accepted"] = "accepted"
+
+
+class ItemMatchOut(BaseModel):
+    recall: RecallSummary
+    tier: Tier
+    reasons: list[str]
+    first_matched_at: datetime
+    dismissed: bool
+
+
+class ItemOut(BaseModel):
+    id: int
+    label: str
+    input_type: InputKind
+    input_value: str
+    purchase_date: date | None
+    verdict: Tier
+    last_checked_at: datetime
+    created_at: datetime
+    matches: list[ItemMatchOut]
+
+
+class NewItem(BaseModel):
+    input: CheckInput
+    label: str | None = Field(default=None, max_length=200)
+    purchase_date: date | None = None
+
+
+AlertTier = Literal["recalled", "check_unit"]
+
+
+class SettingsOut(BaseModel):
+    email_alerts: bool
+    alert_tiers: list[AlertTier]
+
+
+class Me(BaseModel):
+    id: str
+    email: str | None = Field(description="null for demo (anonymous) accounts")
+    is_anonymous: bool
+    settings: SettingsOut
+    items: int
+
+
+class Export(BaseModel):
+    """Everything we hold about a user (SPEC §11: full data export)."""
+
+    exported_at: datetime
+    account: dict[str, object]
+    settings: SettingsOut
+    items: list[ItemOut]
+    alerts: list[dict[str, object]]

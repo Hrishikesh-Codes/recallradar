@@ -1,7 +1,7 @@
 """Parser and fetcher tests against real API responses saved in tests/fixtures."""
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -130,7 +130,8 @@ class TestCpscFetch:
     def test_provider_error_placeholder_is_retried_then_split(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Real response from 2026-10-14: HTTP 200 with one fake "Error retrieving Recalls" record.
+        # Real response from 2026-10-14: HTTP 200 with one fake "Error retrieving Recalls" record,
+        # which CPSC kept serving for the exact URLs that had failed.
         error = load("cpsc/provider_error.json")
         good = load("cpsc/last_publish_window.json")
         monkeypatch.setattr(cpsc, "_sleep", lambda seconds: None)
@@ -139,20 +140,20 @@ class TestCpscFetch:
         def handler(request: httpx.Request) -> httpx.Response:
             window = (request.url.params["RecallDateStart"], request.url.params["RecallDateEnd"])
             seen.append(window)
-            # The whole year keeps failing; each half succeeds.
-            return httpx.Response(
-                200,
-                json=error if window[1] == "2023-12-31" and window[0] == "2023-01-01" else good[:3],
-            )
+            # The whole year (and any slightly longer window) keeps failing; halves work.
+            failing = window[0] == "2023-01-01" and window[1] >= "2023-12-01"
+            return httpx.Response(200, json=error if failing else good[:3])
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
         (batch,) = list(cpsc.fetch(client, start=date(2023, 1, 1), end=date(2023, 12, 31)))
-        assert len(batch) == 6
         assert not cpsc.is_provider_error(batch)
-        assert seen == [("2023-01-01", "2023-12-31")] * cpsc.PROVIDER_ERROR_ATTEMPTS + [
-            ("2023-01-01", "2023-07-02"),
-            ("2023-07-03", "2023-12-31"),
-        ]
+        # Each retry asks for a different URL, then the window is split in two.
+        retries = seen[: cpsc.PROVIDER_ERROR_ATTEMPTS]
+        assert len(set(retries)) == cpsc.PROVIDER_ERROR_ATTEMPTS
+        (first, second) = seen[cpsc.PROVIDER_ERROR_ATTEMPTS :]
+        assert first[0] == "2023-01-01" and second[1] == "2023-12-31"
+        assert date.fromisoformat(second[0]) == date.fromisoformat(first[1]) + timedelta(days=1)
+        assert len(batch) == 6
 
     def test_provider_error_that_persists_fails_the_fetch(
         self, monkeypatch: pytest.MonkeyPatch

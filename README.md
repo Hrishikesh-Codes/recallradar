@@ -5,22 +5,55 @@ describe it, or enter a VIN, and get a clear, evidence-backed verdict from offic
 notices (CPSC, FDA, USDA FSIS, NHTSA). RecallRadar then keeps watching your list and alerts you
 if a recall is announced later.
 
-> **Status: Milestone 0 (foundation).** The repo, database, API skeleton, design system, and CI
-> are in place. Recall data, product checks, and accounts arrive in Milestone 1. No metrics are
-> reported yet; numbers will appear here only once they're measured.
+> **Status: Milestone 1 (thin slice), deployment pending.** Checks against 25,856 CPSC and FDA
+> recalls (every one since 2015) work end to end locally: type, paste a link, or scan a barcode,
+> and get a verdict with its evidence; save items to a list; get an email when a CPSC recall
+> matches one later. USDA FSIS and NHTSA (vehicles, car seats, meat) arrive in M2. Numbers below
+> are measured; how is in [docs/DECISIONS.md](docs/DECISIONS.md).
+
+## How a check works
+
+1. **Read the input.** Typed text is parsed for brand, model numbers, barcodes, lot codes and a
+   purchase date. Links are read from the URL text only; we never open store pages or ask for
+   store passwords. Barcodes are validated, and for food we look up the name on Open Food Facts.
+2. **Find candidates** among 75,176 recalled products with four retrievers merged by
+   reciprocal-rank fusion: exact identifiers, full-text search, trigram similarity, and embeddings
+   (`bge-small-en-v1.5`, HNSW on `halfvec`).
+3. **Decide the tier with plain rules that never overclaim.** *Recalled* only for a barcode, or a
+   model number plus the brand, on a recall that covers every unit. *Check your unit* when the
+   recall covers only some lots, dates or serials, or when the same brand's product line matches.
+   *All clear* says "no recalls found in the sources we checked", never "safe". *Can't check yet*
+   for categories other agencies cover.
+4. **Show the evidence:** why it matched, what to check on your label and where to find it, the
+   hazard, what to do, and the official notice.
+
+## Measured so far
+
+| What | Result |
+|---|---|
+| Recalls indexed (since 2015) | 25,856 (CPSC 3,710 · FDA food 6,353 · drugs 3,824 · devices 11,969) |
+| Database size, everything embedded | 427 MB (Neon's free plan: 1 GB) |
+| Vector search vs exact search | recall@50 0.988 at 1.9 ms median (80 queries) |
+| Check latency (local, M-series Mac) | 35 ms median over the 53-case smoke set |
+| M1 smoke set | 53/53 after tuning on it: a regression check, **not** an accuracy estimate (M3) |
 
 ## What's here
 
-- **Web** (`apps/web`): Next.js 16, React 19, TypeScript (strict), Tailwind CSS 4. A dark,
-  glass-and-hairline design system with a living gallery at `/dev`, tested for WCAG AA contrast,
-  keyboard use, reduced motion, and phone layouts.
-- **API** (`apps/api`): FastAPI on Python 3.12, with health and readiness endpoints, JSON logs,
-  request IDs, and optional Sentry. Its OpenAPI schema generates the web app's TypeScript types.
-- **Database** (`packages/core`): PostgreSQL with pgvector and pg_trgm; SQLAlchemy 2 models and
-  Alembic migrations, tested against each other.
-- **CI**: lint, strict type checks, Python and web unit tests, a production build, Playwright E2E
-  (desktop, phone, reduced motion, with axe accessibility scans), a Docker image smoke test, and
-  a secret scan on every push.
+- **Web** (`apps/web`): Next.js 16, React 19, TypeScript (strict), Tailwind CSS 4. Landing page
+  with a WebGL2 radar and a live recall counter, the check flow (text, link, camera barcode
+  scanning), the verdict screen, sign-in by email link, a demo account, My List, account
+  settings with export and delete, and a privacy page. Tested for WCAG AA, keyboard use, reduced
+  motion, Android and iPhone layouts.
+- **API** (`apps/api`): FastAPI on Python 3.12. `/v1/check`, feedback, recall details, coverage
+  stats, and the signed-in list endpoints; per-IP rate limits; the embedding model baked into
+  the Docker image. Its OpenAPI schema generates the web app's TypeScript types.
+- **Ingest** (`packages/ingest`): CPSC and openFDA clients and the extraction of barcodes, model
+  numbers, lot codes, sale dates and unit restrictions from recall text.
+- **Matching** (`packages/matching`): retrieval, tier rules, and re-checks of watched items.
+- **Jobs** (`jobs`): daily sync, embedding, and alerts (GitHub Actions cron); the evaluation CLI.
+- **CI**: lint, strict type checks, Python tests against real Postgres with real recall fixtures
+  and the real model, web unit tests, a production build, Playwright E2E with axe scans on four
+  device profiles, a Docker image smoke test, and a secret scan on every push.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system diagram and data model,
 [docs/DESIGN.md](docs/DESIGN.md) for the design system, and
@@ -32,18 +65,23 @@ You need [uv](https://docs.astral.sh/uv/), [pnpm](https://pnpm.io/) and Node 24+
 (Docker Desktop, OrbStack, or Colima).
 
 ```bash
-make install   # Python + web dependencies
-make up        # Postgres, Mailpit, and the API (migrations run on start)
-make web       # http://localhost:3000
+make install              # Python + web dependencies
+make up                   # Postgres, Mailpit, and the API (migrations run on start)
+make sync MODE=backfill   # every recall since 2015 (about 3 minutes)
+make embed                # embeddings for semantic search (about 25 minutes the first time)
+make web                  # http://localhost:3000
 ```
 
 The API is at http://localhost:8000 (`/healthz`, `/readyz`, `/docs`), and Mailpit's inbox (for
-magic links and alerts, later) at http://localhost:8025.
+sign-in links and alerts) at http://localhost:8025. Sign-in and My List need the same
+`API_TOKEN_SECRET` in `.env` and `apps/web/.env.local` (any random 32+ characters).
 
 | Command | What it does |
 |---|---|
 | `make check` | Lint, strict type checks, and all unit tests |
 | `make e2e` | Production build + Playwright (desktop, mobile, reduced motion) |
+| `make sync` / `make embed` / `make alerts` | The daily job's steps, by hand |
+| `make eval` | Run the labelled smoke set through the matcher |
 | `make migrate` | Apply migrations to `DATABASE_URL` |
 | `make openapi` | Regenerate the API schema and TypeScript types |
 | `make help` | Everything else |
@@ -57,12 +95,13 @@ defaults. Never commit real secrets.
 apps/web            Next.js PWA
 apps/api            FastAPI service (+ Dockerfile, also used by Hugging Face Spaces)
 packages/core       settings, logging, models, migrations
-packages/ingest     recall ingesters + extraction            (M1)
-packages/identify   inputs -> ProductQuery                   (M1–M2)
-packages/matching   matching engine + evaluation             (M1, M3)
+packages/ingest     CPSC + openFDA ingesters, extraction
+packages/identify   inputs -> ProductQuery (text, link, barcode; photos and VIN in M2)
+packages/matching   retrieval, tier rules, watched-item re-checks (trained scorer in M3)
 packages/ask        citation-grounded RAG                    (M4)
 packages/earlywarn  complaint-surge backtest                 (M5)
-jobs                scheduled sync -> match -> alert          (M1)
+jobs                daily sync -> embed -> alerts, evaluation CLI
+data/labels         hand-labelled evaluation data
 docs                architecture, decisions, design, evaluations
 ```
 
@@ -71,7 +110,7 @@ docs                architecture, decisions, design, evaluations
 | Milestone | Scope |
 |---|---|
 | **M0 — Foundation** ✅ | Monorepo, Docker Compose, migrations, CI, design system, docs |
-| M1 — Thin slice | CPSC + FDA ingestion on a schedule; typed/link/barcode input; baseline matcher with tiers; verdict screen; radar landing; magic-link sign-in, My List, email alerts; live demo |
+| **M1 — Thin slice** (built; deploying) | CPSC + FDA ingestion on a schedule; typed/link/barcode input; baseline matcher with tiers; verdict screen; radar landing; magic-link sign-in, My List, email alerts; live demo |
 | M2 — Full coverage | USDA FSIS + NHTSA + VIN; label photo and order screenshot input; web push; installable PWA |
 | M3 — Matching v2 | Labelled test set, trained and calibrated scorer, benchmark, EVAL.md |
 | M4 — Ask | RAG with citations, verification, abstention, and an ablation study |

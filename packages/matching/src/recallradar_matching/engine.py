@@ -27,9 +27,17 @@ from recallradar_core.categories import is_safety_critical, sources_for
 from recallradar_core.db import Recall, RecallProduct
 from recallradar_core.enums import SOURCE_LABELS, NoticeType, RecallSource
 from recallradar_identify.query import ProductQuery
+from recallradar_identify.text import model_tokens
 from recallradar_ingest.extract.text import code_key
 from recallradar_matching.embed import Embedder
-from recallradar_matching.text import GENERIC, brand_tokens, distinctive_tokens, tokens
+from recallradar_matching.text import (
+    GENERIC,
+    brand_tokens,
+    distinctive_tokens,
+    stems,
+    title_product_phrase,
+    tokens,
+)
 
 CANDIDATES_PER_RETRIEVER = 50
 RRF_K = 60
@@ -39,6 +47,10 @@ FAMILY_SIMILARITY = 0.80
 FAMILY_SIMILARITY_SAFETY_CRITICAL = 0.76
 RELATED_SIMILARITY = 0.70
 TRIGRAM_FAMILY = 0.60
+# Same brand but no shared product-line word ("Fisher-Price Rock 'n Play" vs "Fisher-Price
+# Infant Motion Seats"): only a near-identical name still counts as the same family.
+FAMILY_SIMILARITY_STRONG = 0.88
+LINE_AGREES, LINE_DIFFERS, LINE_UNKNOWN = "agrees", "differs", "unknown"
 MAX_MATCHES = 5
 MAX_RELATED = 5
 # Brand words are rare: "Graco" is in 3 of 75,000 recalled products, "Multi" in over 1,000.
@@ -78,6 +90,9 @@ class Match:
     tier: Tier | None  # None: related, not a match
     signals: Signals
     brand_match: bool
+    # Query words naming the brand, and whether the product lines beyond it agree.
+    brand_words: set[str] = field(default_factory=set)
+    line: str = "unknown"
     reasons: list[str] = field(default_factory=list)
     what_to_check: list[str] = field(default_factory=list)
 
@@ -245,10 +260,16 @@ def _score(match: Match, query: ProductQuery, safety_critical: bool) -> None:
 
     family_threshold = FAMILY_SIMILARITY_SAFETY_CRITICAL if safety_critical else FAMILY_SIMILARITY
     similar_name = s.vector_similarity >= family_threshold or s.trigram_similarity >= TRIGRAM_FAMILY
+    # When the query and the recall both name a product line beyond the brand ("Rock 'n Play"
+    # vs "Infant Motion Seats") and the lines differ, only a near-identical name still counts.
+    line_ok = match.line != LINE_DIFFERS or s.vector_similarity >= FAMILY_SIMILARITY_STRONG
+    # "Peloton PL01" is not the recalled "Peloton Bike+ PL02": a model the user gave that the
+    # recall's model list doesn't contain argues against the match.
+    conflict = _model_conflict(query, product, match.brand_words)
     if (
         (s.model and _any_distinctive(model_hits))
         or ((s.weak_model or s.lot) and match.brand_match)
-        or (match.brand_match and similar_name)
+        or (match.brand_match and similar_name and line_ok and not conflict)
     ):
         match.tier = Tier.CHECK_UNIT
         if match.brand_match and not (s.model or s.weak_model):
@@ -264,6 +285,38 @@ def _score(match: Match, query: ProductQuery, safety_critical: bool) -> None:
             + restricted_detail
             + list(product.where_to_look)
         )
+
+
+def _line_words(query: ProductQuery, brand_words: set[str]) -> set[str]:
+    """Distinctive query words beyond the brand and model numbers, plural-folded."""
+    model_words = {t for m in query.model_numbers for t in tokens(m)}
+    return stems(distinctive_tokens(query.search_text()) - brand_words - model_words)
+
+
+def _model_conflict(query: ProductQuery, product: RecallProduct, brand_words: set[str]) -> bool:
+    models = {
+        code_key(m)
+        for m in query.model_numbers
+        if _distinctive_key(code_key(m)) and not set(tokens(m)) & brand_words
+    }
+    # Model numbers the recall lists, plus codes in its product name ("PR70P Clip-In Pedals").
+    listed = (
+        set(product.model_keys)
+        | set(product.weak_model_keys)
+        | {code_key(t) for t in model_tokens(product.product_name[:300])}
+    )
+    if not models or not listed:
+        return False
+    # A listed series ("WA50B") or a longer listed form ("WA50B5100AWUS") is consistent.
+    return (
+        not any(
+            m.startswith(key) or key.startswith(m)
+            for m in models
+            for key in listed
+            if len(key) >= 4
+        )
+        and not models & listed
+    )
 
 
 class _TokenFrequency:
@@ -288,24 +341,25 @@ class _TokenFrequency:
 
 def _brand_match(
     query_brand: set[str], product: RecallProduct, recall: Recall, frequency: _TokenFrequency
-) -> bool:
-    """Does the query name the recalled product's brand or maker?"""
+) -> set[str]:
+    """The query words that name the recalled product's brand or maker (empty if none)."""
     named = brand_tokens([product.brand, recall.firm, product.manufacturer])
     # CPSC product names usually start with the brand ("YOLAAH Portable Bed Rails"), which can
     # differ from the firm ("Guangzhou Aowei Technology"). Common first words ("Multi-Point")
     # aren't brands, so the word must be rare across all recalls.
     first_word = set(tokens(product.product_name)[:1]) - GENERIC - named
     model_keys = set(product.model_keys)
+    found: set[str] = set()
     for token in query_brand:
         if code_key(token) in model_keys:
             continue  # a matched model number is already counted; it isn't also the brand
         # Containment covers brands inside company names: "Ninja" in "SharkNinja".
         if any(token == name or (len(token) >= 4 and token in name) for name in named):
             if frequency(token) <= MAX_BRAND_FREQUENCY:
-                return True
+                found.add(token)
         elif token in first_word and frequency(token) <= MAX_FIRST_WORD_FREQUENCY:
-            return True
-    return False
+            found.add(token)
+    return found
 
 
 def _any_distinctive(models: list[str]) -> bool:
@@ -348,12 +402,28 @@ def check(
 
     candidates: list[Match] = []
     for product, recall in rows:
+        brand_words = _brand_match(query_brand, product, recall, frequency)
+        # The recall title often names the product line when the product name doesn't
+        # ("IKEA Recalls 29 Million MALM ... Dressers" for "Children's ... dressers").
+        recall_line = stems(
+            distinctive_tokens(f"{product.product_name} {title_product_phrase(recall.title)}")
+        ) - stems(brand_tokens([product.brand, recall.firm, product.manufacturer]))
+        query_line = _line_words(query, brand_words)
+        line = (
+            LINE_UNKNOWN
+            if not (query_line and recall_line)
+            else LINE_AGREES
+            if query_line & recall_line
+            else LINE_DIFFERS
+        )
         match = Match(
             product=product,
             recall=recall,
             tier=None,
             signals=signals[product.id],
-            brand_match=_brand_match(query_brand, product, recall, frequency),
+            brand_match=bool(brand_words),
+            brand_words=brand_words,
+            line=line,
         )
         _score(match, query, safety_critical_query or product.safety_critical)
         match.what_to_check = list(dict.fromkeys(match.what_to_check))

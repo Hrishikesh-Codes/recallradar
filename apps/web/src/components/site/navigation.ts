@@ -4,6 +4,7 @@ import type { Route } from "next";
 export const NAV_LINKS: ReadonlyArray<{ href: Route; label: string }> = [
   { href: "/", label: "Home" },
   { href: "/check", label: "Check a product" },
+  { href: "/list", label: "My list" },
   { href: "/#how-it-works", label: "How it works" },
-  { href: "/dev", label: "Design system" },
+  { href: "/privacy", label: "Privacy" },
 ];

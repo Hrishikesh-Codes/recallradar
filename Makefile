@@ -62,7 +62,7 @@ test: ## Python tests (DB tests need `make up`) and web unit tests
 	$(WEB) test
 
 .PHONY: e2e
-e2e: ## Build the web app and run Playwright (desktop, mobile, reduced motion)
+e2e: ## Build the web app and run Playwright (desktop, Android, iPhone, reduced motion)
 	$(WEB) build
 	$(WEB) e2e
 
@@ -74,6 +74,18 @@ openapi: ## Regenerate the API schema and the web app's TypeScript types
 .PHONY: check
 check: lint typecheck test ## Everything CI runs except e2e
 
+.PHONY: sync
+sync: ## Fetch new and updated recalls (MODE=backfill for everything since 2015)
+	uv run recallradar-sync --source all --mode $(or $(MODE),incremental)
+
+.PHONY: embed
+embed: ## Embed recall products that don't have an embedding yet
+	uv run recallradar-embed
+
+.PHONY: alerts
+alerts: ## Re-check watched items and email new matches (Mailpit locally)
+	SMTP_URL=$(or $(SMTP_URL),smtp://localhost:1025) uv run recallradar-alerts
+
 .PHONY: eval
-eval: ## Matching-engine evaluation (arrives in M3)
-	@echo "make eval: the labelled evaluation set and script arrive in Milestone 3 (SPEC §6.9)." && exit 1
+eval: ## Run the M1 smoke set through the matcher (M3 adds the labelled test set)
+	uv run recallradar-eval

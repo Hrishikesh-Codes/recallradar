@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LOCAL_DATABASE_URL = "postgresql+psycopg://recallradar:recallradar@localhost:5432/recallradar"
@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     # Optional: raises openFDA's limit from 1,000 to 120,000 requests/day.
     openfda_api_key: str | None = None
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+    # Shared with the web server, which signs a short-lived token per request for signed-in
+    # users (HS256). Without it, account endpoints are disabled.
+    api_token_secret: SecretStr | None = None
+    # Public web address, for links in emails.
+    web_url: str = "http://localhost:3000"
+    # Outgoing mail for alerts: smtp://localhost:1025 (Mailpit) locally, Resend's SMTP in prod.
+    smtp_url: SecretStr | None = None
+    mail_from: str = "RecallRadar <alerts@localhost>"
 
     @field_validator("database_url")
     @classmethod
@@ -37,6 +45,13 @@ class Settings(BaseSettings):
         for prefix in ("postgres://", "postgresql://"):
             if value.startswith(prefix):
                 return "postgresql+psycopg://" + value.removeprefix(prefix)
+        return value
+
+    @field_validator("api_token_secret")
+    @classmethod
+    def _long_enough(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and len(value.get_secret_value()) < 32:
+            raise ValueError("API_TOKEN_SECRET must be at least 32 characters")
         return value
 
     @field_validator("cors_origins", mode="before")

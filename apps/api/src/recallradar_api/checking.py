@@ -16,10 +16,9 @@ from recallradar_api import schemas
 from recallradar_api.ratelimit import RateLimiter
 from recallradar_core.db import BarcodeLookup, Event, Recall, RecallProduct, SyncRun
 from recallradar_core.enums import SOURCE_LABELS, RecallSource, RemedyType, SyncStatus
-from recallradar_identify.barcode import BarcodeInfo, lookup_open_food_facts, parse_barcode
-from recallradar_identify.link import parse_link
+from recallradar_identify.barcode import BarcodeInfo, lookup_open_food_facts
+from recallradar_identify.parse import parse_input
 from recallradar_identify.query import ProductQuery
-from recallradar_identify.text import parse_text
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import CheckResult, Match, check, embed_query
 
@@ -88,15 +87,8 @@ def _info(row: BarcodeLookup) -> BarcodeInfo:
 def build_query(
     session: Session, request: schemas.CheckRequest, barcodes: BarcodeLookups | None
 ) -> ProductQuery:
-    value = request.input.value
-    match request.input.type:
-        case "text":
-            query = parse_text(value)
-        case "link":
-            query = parse_link(value)
-        case "barcode":
-            lookup = (lambda gtin14: barcodes.lookup(session, gtin14)) if barcodes else None
-            query = parse_barcode(value, lookup)
+    lookup = (lambda gtin14: barcodes.lookup(session, gtin14)) if barcodes else None
+    query = parse_input(request.input.type, request.input.value, lookup)
     if request.purchase_date is not None:
         query.purchase_date = request.purchase_date
     return query

@@ -9,7 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from recallradar_api import __version__
-from recallradar_api.routes import check, health, recalls
+from recallradar_api.routes import check, health, me, recalls
 from recallradar_api.state import AppState, default_state
 from recallradar_core.db.session import get_sessionmaker
 from recallradar_core.logs import configure_logging
@@ -75,4 +75,5 @@ def create_app(settings: Settings | None = None, state: AppState | None = None) 
     app.include_router(health.router)
     app.include_router(check.router)
     app.include_router(recalls.router)
+    app.include_router(me.router)
     return app

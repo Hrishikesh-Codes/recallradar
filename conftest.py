@@ -72,13 +72,8 @@ def embedder() -> Embedder:
     return Embedder(Settings().model_cache_dir)
 
 
-@pytest.fixture(scope="session")
-def loaded_database_url(create_database: Callable[[], str], embedder: Embedder) -> str:
-    """A migrated database holding every real CPSC/openFDA fixture record, embedded.
-
-    Read-only for tests: anything that writes should create its own database.
-    """
-    url = create_database()
+def load_fixture_recalls(url: str, embedder: Embedder) -> None:
+    """Migrate `url` and fill it with every real CPSC/openFDA fixture record, embedded."""
     upgrade_to_head(url)
     engine = create_engine(url)
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
@@ -93,4 +88,19 @@ def loaded_database_url(create_database: Callable[[], str], embedder: Embedder) 
         store.upsert(session, records)
     embed_missing(sessions, embedder, batch_size=64)
     engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def loaded_database_url(create_database: Callable[[], str], embedder: Embedder) -> str:
+    """A database holding every fixture recall, shared by the session: don't write to it."""
+    url = create_database()
+    load_fixture_recalls(url, embedder)
+    return url
+
+
+@pytest.fixture
+def writable_database_url(create_database: Callable[[], str], embedder: Embedder) -> str:
+    """A fresh database with the fixture recalls, for tests that write."""
+    url = create_database()
+    load_fixture_recalls(url, embedder)
     return url

@@ -8,7 +8,9 @@ labelled set (M3) is what the README will report.
 Errors are counted by how much they could hurt someone:
 - overclaim: "Recalled" when a human says only some units are, or none (§6.4 forbids this);
 - dangerous miss: a recalled product reported as all clear;
-- false alarm: an unrecalled product reported as recalled or "check your unit".
+- false alarm: an unrecalled product reported as recalled or "check your unit";
+- extra match: a recall listed that a human ruled out (`not_recalls`: a sibling model, the same
+  brand's other product, another firm's similar product).
 """
 
 import argparse
@@ -24,10 +26,8 @@ from typing import Any
 from recallradar_core.db.session import get_sessionmaker
 from recallradar_core.enums import RecallSource
 from recallradar_core.settings import get_settings
-from recallradar_identify.barcode import parse_barcode
-from recallradar_identify.link import parse_link
+from recallradar_identify.parse import parse_input
 from recallradar_identify.query import ProductQuery
-from recallradar_identify.text import parse_text
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import Tier, check, embed_query
 
@@ -53,12 +53,13 @@ class Outcome:
 
 
 def to_query(kind: str, value: str) -> ProductQuery:
+    # No Open Food Facts lookup for barcodes: the evaluation runs offline and repeatably.
     if kind == "text":
-        return parse_text(value)
+        return parse_input("text", value)
     if kind == "link":
-        return parse_link(value)
+        return parse_input("link", value)
     if kind == "barcode":
-        return parse_barcode(value)  # no Open Food Facts lookup: offline and repeatable
+        return parse_input("barcode", value)
     raise ValueError(f"unknown input type {kind!r}")
 
 
@@ -74,6 +75,8 @@ def judge(case: dict[str, Any], got: Tier, got_recalls: list[str]) -> list[str]:
         errors.append("false_alarm")
     if wanted and got in _POSITIVE and not wanted & set(got_recalls):
         errors.append("wrong_recall")
+    if set(case.get("not_recalls", [])) & set(got_recalls):
+        errors.append("extra_match")
     if got is not expected and not errors:
         errors.append("wrong_verdict")
     return errors

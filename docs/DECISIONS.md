@@ -128,6 +128,14 @@ why, and what it costs.
 - **Mail goes out over SMTP**: Mailpit locally, Resend's SMTP in production. One code path for
   both apps.
 
+### Hosting
+
+- **Hugging Face Docker Spaces are no longer free for personal accounts.** Its docs now say
+  "Gradio and Docker Spaces run on compute and require a paid plan to create: PRO for personal
+  accounts" (checked 2026-10-14; forum reports date the change to mid-2026). The API's host is
+  therefore an open decision. The image is host-neutral (Docker, port from `$PORT`, model baked
+  in, 191 MiB idle), and `deploy-api.yml` only runs once a Space is configured.
+
 ### Web
 
 - **Barcode scanning uses the browser's BarcodeDetector where it exists, otherwise ZXing

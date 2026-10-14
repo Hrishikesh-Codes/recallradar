@@ -25,9 +25,10 @@ from sqlalchemy.orm import Session
 
 from recallradar_core.categories import is_safety_critical, sources_for
 from recallradar_core.db import Recall, RecallProduct
-from recallradar_core.enums import NoticeType, RecallSource
+from recallradar_core.enums import SOURCE_LABELS, NoticeType, RecallSource
 from recallradar_identify.query import ProductQuery
 from recallradar_ingest.extract.text import code_key
+from recallradar_matching.embed import Embedder
 from recallradar_matching.text import GENERIC, brand_tokens, distinctive_tokens, tokens
 
 CANDIDATES_PER_RETRIEVER = 50
@@ -40,6 +41,10 @@ RELATED_SIMILARITY = 0.70
 TRIGRAM_FAMILY = 0.60
 MAX_MATCHES = 5
 MAX_RELATED = 5
+# Brand words are rare: "Graco" is in 3 of 75,000 recalled products, "Multi" in over 1,000.
+FREQUENCY_CAP = 1000
+MAX_BRAND_FREQUENCY = 500
+MAX_FIRST_WORD_FREQUENCY = 100
 # A purchase this long before the recalled units went on sale is unlikely to be one of them.
 SOLD_WINDOW_SLACK = timedelta(days=60)
 
@@ -166,7 +171,7 @@ def _retrieve(
             get(product_id).trigram_similarity = float(score)
 
     if embedding is not None:
-        session.execute(text("SET LOCAL hnsw.ef_search = 100"))
+        session.execute(text("SET LOCAL hnsw.ef_search = 400"))
         distance = RecallProduct.embedding.cosine_distance(embedding)
         vector_rows = session.execute(
             select(RecallProduct.id, distance)
@@ -194,16 +199,8 @@ def _format_window(product: RecallProduct) -> str:
 
 
 def _source_label(recall: Recall) -> str:
-    names = {
-        RecallSource.CPSC: "CPSC",
-        RecallSource.FDA_FOOD: "FDA",
-        RecallSource.FDA_DRUG: "FDA",
-        RecallSource.FDA_DEVICE: "FDA",
-        RecallSource.FSIS: "USDA FSIS",
-        RecallSource.NHTSA: "NHTSA",
-    }
     kind = "warning" if recall.notice_type is NoticeType.WARNING else "recall"
-    return f"{names[recall.source]} {kind} {recall.reference or recall.source_recall_id}"
+    return f"{SOURCE_LABELS[recall.source]} {kind} {recall.reference or recall.source_recall_id}"
 
 
 def _score(match: Match, query: ProductQuery, safety_critical: bool) -> None:
@@ -269,6 +266,48 @@ def _score(match: Match, query: ProductQuery, safety_critical: bool) -> None:
         )
 
 
+class _TokenFrequency:
+    """How many recalled products mention a word (capped), to tell brands from common words."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+        self._cache: dict[str, int] = {}
+
+    def __call__(self, token: str) -> int:
+        if token not in self._cache:
+            q = func.plainto_tsquery("english", token)
+            hits = (
+                select(literal(1))
+                .where(RecallProduct.search_text.op("@@")(q))
+                .limit(FREQUENCY_CAP)
+                .subquery()
+            )
+            self._cache[token] = self._session.scalar(select(func.count()).select_from(hits)) or 0
+        return self._cache[token]
+
+
+def _brand_match(
+    query_brand: set[str], product: RecallProduct, recall: Recall, frequency: _TokenFrequency
+) -> bool:
+    """Does the query name the recalled product's brand or maker?"""
+    named = brand_tokens([product.brand, recall.firm, product.manufacturer])
+    # CPSC product names usually start with the brand ("YOLAAH Portable Bed Rails"), which can
+    # differ from the firm ("Guangzhou Aowei Technology"). Common first words ("Multi-Point")
+    # aren't brands, so the word must be rare across all recalls.
+    first_word = set(tokens(product.product_name)[:1]) - GENERIC - named
+    model_keys = set(product.model_keys)
+    for token in query_brand:
+        if code_key(token) in model_keys:
+            continue  # a matched model number is already counted; it isn't also the brand
+        # Containment covers brands inside company names: "Ninja" in "SharkNinja".
+        if any(token == name or (len(token) >= 4 and token in name) for name in named):
+            if frequency(token) <= MAX_BRAND_FREQUENCY:
+                return True
+        elif token in first_word and frequency(token) <= MAX_FIRST_WORD_FREQUENCY:
+            return True
+    return False
+
+
 def _any_distinctive(models: list[str]) -> bool:
     return any(_distinctive_key(code_key(m)) for m in models)
 
@@ -304,25 +343,32 @@ def check(
     query_brand = (
         brand_tokens([query.brand]) if query.brand else distinctive_tokens(query.search_text())
     )
-    model_tokens = {t for m in query.model_numbers for t in tokens(m)}
-    query_brand -= model_tokens
     safety_critical_query = is_safety_critical(query.categories)
+    frequency = _TokenFrequency(session)
 
     candidates: list[Match] = []
     for product, recall in rows:
-        names = [product.brand, recall.firm, product.manufacturer]
-        first_word = tokens(product.product_name)[:1]
-        # CPSC product names usually start with the brand ("YOLAAH Portable Bed Rails").
-        candidate_brand = brand_tokens(names) | (set(first_word) - GENERIC)
         match = Match(
             product=product,
             recall=recall,
             tier=None,
             signals=signals[product.id],
-            brand_match=bool(query_brand & candidate_brand),
+            brand_match=_brand_match(query_brand, product, recall, frequency),
         )
         _score(match, query, safety_critical_query or product.safety_critical)
+        match.what_to_check = list(dict.fromkeys(match.what_to_check))
         candidates.append(match)
+
+    needed = sources_for(query.categories)
+    uncovered = sorted(needed - set(ingested), key=list(RecallSource).index)
+    if needed and not needed & set(ingested):
+        # The product belongs to an agency we don't ingest yet (a car seat, bacon). A similar
+        # name from another agency's recall is not evidence; only an identifier match is.
+        for match in candidates:
+            if not (match.signals.upc or match.signals.model):
+                match.tier = None
+                match.reasons.clear()
+                match.what_to_check.clear()
 
     matches = sorted(
         (m for m in candidates if m.tier is not None),
@@ -349,8 +395,6 @@ def check(
         )
     )[:MAX_RELATED]
 
-    needed = sources_for(query.categories)
-    uncovered = sorted(needed - set(ingested), key=list(RecallSource).index)
     if matches:
         verdict = matches[0].tier or Tier.ALL_CLEAR
     elif uncovered:
@@ -361,6 +405,12 @@ def check(
     else:
         verdict = Tier.ALL_CLEAR
     return CheckResult(verdict, matches, related, list(ingested), uncovered, notes)
+
+
+def embed_query(embedder: Embedder, query: ProductQuery) -> list[float] | None:
+    """The query's embedding, or None when it has no words to embed (e.g. a bare barcode)."""
+    text = query.search_text()
+    return embedder.query(text) if tokens(text) else None
 
 
 def _one_per_recall(matches: list[Match]) -> list[Match]:

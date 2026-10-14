@@ -6,11 +6,16 @@ Official guide: "Recall Retrieval Web Services Programmer's Guide", v1.4 (2018-0
   are checked against the documented list and oversized responses are rejected.
 - Since 2015, every record has exactly one `Products` entry, its `Model` field is always empty,
   and only 6% list `ProductUPCs`; model numbers live in the free-text `Description`.
+- When its database fails, the service still answers HTTP 200, with a single placeholder record
+  (`RecallID` 0, `Title` "Error retrieving Recalls: ..."). Such a response is retried, then the
+  window is split in half; it is never stored.
 """
 
+import logging
 import re
+import time
 from collections.abc import Iterator
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -21,6 +26,8 @@ from recallradar_ingest.extract import codes, dates, restrictions
 from recallradar_ingest.extract.text import clean
 from recallradar_ingest.http import get_json
 from recallradar_ingest.records import ProductRecord, RecallRecord, barcodes, split_barcodes
+
+logger = logging.getLogger("recallradar.ingest.cpsc")
 
 URL = "https://www.saferproducts.gov/RestWebServices/Recall"
 
@@ -58,32 +65,67 @@ _TYPE_CATEGORIES = {
 }
 
 
+# Placeholder-error retries per window before splitting it, and the smallest window to split.
+PROVIDER_ERROR_ATTEMPTS = 3
+PROVIDER_ERROR_BACKOFF_S = 10.0
+MIN_SPLIT_DAYS = 14
+
+
+_sleep = time.sleep  # replaced in tests
+
+
 class SuspiciousResponseError(RuntimeError):
     """The API returned far more records than any real window holds (a filter was ignored)."""
 
 
-def fetch(
-    client: httpx.Client, *, start: date, end: date, by_last_publish: bool = False
-) -> Iterator[list[dict[str, Any]]]:
-    """Yield batches of raw recalls, one calendar year per request."""
-    prefix = "LastPublishDate" if by_last_publish else "RecallDate"
-    for year in range(start.year, end.year + 1):
-        window_start = max(start, date(year, 1, 1))
-        window_end = min(end, date(year, 12, 31))
-        params = {
-            "format": "json",
-            f"{prefix}Start": window_start.isoformat(),
-            f"{prefix}End": window_end.isoformat(),
-        }
-        unknown = set(params) - DOCUMENTED_PARAMETERS
-        if unknown:  # pragma: no cover - guards future edits
-            raise ValueError(f"undocumented CPSC parameters {unknown}")
+class ProviderError(RuntimeError):
+    """CPSC's service kept answering with its "Error retrieving Recalls" placeholder."""
+
+
+def is_provider_error(records: list[dict[str, Any]]) -> bool:
+    return any(
+        not record.get("RecallID") and str(record.get("Title") or "").startswith("Error")
+        for record in records
+    )
+
+
+def _get_window(client: httpx.Client, prefix: str, start: date, end: date) -> list[dict[str, Any]]:
+    params = {
+        "format": "json",
+        f"{prefix}Start": start.isoformat(),
+        f"{prefix}End": end.isoformat(),
+    }
+    unknown = set(params) - DOCUMENTED_PARAMETERS
+    if unknown:  # pragma: no cover - guards future edits
+        raise ValueError(f"undocumented CPSC parameters {unknown}")
+    for attempt in range(1, PROVIDER_ERROR_ATTEMPTS + 1):
         records = get_json(client, URL, params)
         if not isinstance(records, list):
             raise SuspiciousResponseError(f"expected a list, got {type(records).__name__}")
         if len(records) > MAX_PLAUSIBLE_WINDOW:
             raise SuspiciousResponseError(f"{len(records)} recalls for {params}")
-        yield records
+        if not is_provider_error(records):
+            return records
+        logger.warning("cpsc provider error", extra={"params": params, "attempt": attempt})
+        if attempt < PROVIDER_ERROR_ATTEMPTS:
+            _sleep(PROVIDER_ERROR_BACKOFF_S * attempt)
+    if (end - start).days < MIN_SPLIT_DAYS:
+        raise ProviderError(f"CPSC kept failing for {params}")
+    middle = start + (end - start) / 2
+    return _get_window(client, prefix, start, middle) + _get_window(
+        client, prefix, middle + timedelta(days=1), end
+    )
+
+
+def fetch(
+    client: httpx.Client, *, start: date, end: date, by_last_publish: bool = False
+) -> Iterator[list[dict[str, Any]]]:
+    """Yield batches of raw recalls, one calendar year per request (smaller if CPSC fails)."""
+    prefix = "LastPublishDate" if by_last_publish else "RecallDate"
+    for year in range(start.year, end.year + 1):
+        yield _get_window(
+            client, prefix, max(start, date(year, 1, 1)), min(end, date(year, 12, 31))
+        )
 
 
 def _names(items: list[dict[str, Any]] | None, key: str = "Name") -> list[str]:

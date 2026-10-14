@@ -60,6 +60,19 @@ _ALL_INCLUDED = re.compile(
     re.I,
 )
 
+# Words that say which units are affected. A sentence that only says where a serial or lot number
+# is printed ("The model number ... can be found on the label, along with the serial number") is
+# not a restriction on its own.
+_WHICH_UNITS = re.compile(
+    r"\b(?:begin(?:s|ning)?|start(?:s|ing)?|end(?:s|ing)?|between|through|thru|range[sd]?|"
+    r"included|affected|involved|only|following|listed\s+(?:below|above)|qualifying|containing|"
+    r"subject|from\s+\S+\s+to)\b",
+    re.I,
+)
+_IDENTIFIER_KINDS = frozenset(
+    {RestrictionKind.SERIAL, RestrictionKind.LOT, RestrictionKind.DATE_CODE}
+)
+
 _LOCATION = re.compile(
     r"\b(?:printed|located|found|stamped|molded|moulded|engraved|embossed|appears?|listed|marked|"
     r"labeled|labelled|sewn|etched|imprinted)\b[^.]{0,80}\b(?:on|in|inside|under|beneath|near|"
@@ -103,7 +116,10 @@ def cpsc_restrictions(description: str, codes: CodeScan) -> list[Restriction]:
     for sentence in sentences(description):
         if _ALL_INCLUDED.search(sentence):
             continue
+        location_only = bool(_LOCATION.search(sentence)) and not _WHICH_UNITS.search(sentence)
         for kind, pattern in _CPSC_PATTERNS:
+            if kind in _IDENTIFIER_KINDS and location_only:
+                continue
             if kind not in found and pattern.search(sentence):
                 found[kind] = Restriction(kind, truncate(sentence, 300))
     for kind in _kinds_from_scan(codes):

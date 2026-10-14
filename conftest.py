@@ -6,16 +6,24 @@ DB tests are skipped when Postgres isn't reachable, unless REQUIRE_DB_TESTS=1 (s
 in which case they fail loudly instead of silently passing.
 """
 
+import json
 import os
 import uuid
 from collections.abc import Callable, Iterator
+from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import sessionmaker
 
 from recallradar_core.db.migrate import upgrade_to_head
-from recallradar_core.settings import LOCAL_DATABASE_URL
+from recallradar_core.enums import RecallSource
+from recallradar_core.settings import LOCAL_DATABASE_URL, Settings
+from recallradar_ingest import store
+from recallradar_ingest.sources import cpsc, openfda
+from recallradar_matching.embed import Embedder, embed_missing
 
 
 @pytest.fixture(scope="session")
@@ -49,4 +57,40 @@ def migrated_database_url(create_database: Callable[[], str]) -> str:
     """URL of a test database migrated to the latest schema (shared by the whole session)."""
     url = create_database()
     upgrade_to_head(url)
+    return url
+
+
+FIXTURES = Path(__file__).parent / "tests" / "fixtures"
+
+
+def load_fixture(name: str) -> Any:
+    return json.loads((FIXTURES / name).read_text())
+
+
+@pytest.fixture(scope="session")
+def embedder() -> Embedder:
+    return Embedder(Settings().model_cache_dir)
+
+
+@pytest.fixture(scope="session")
+def loaded_database_url(create_database: Callable[[], str], embedder: Embedder) -> str:
+    """A migrated database holding every real CPSC/openFDA fixture record, embedded.
+
+    Read-only for tests: anything that writes should create its own database.
+    """
+    url = create_database()
+    upgrade_to_head(url)
+    engine = create_engine(url)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    records = [cpsc.parse(raw) for raw in load_fixture("cpsc/recalls_by_id.json")]
+    for source, name in [
+        (RecallSource.FDA_FOOD, "openfda/food_by_recall_number.json"),
+        (RecallSource.FDA_DRUG, "openfda/drug_by_recall_number.json"),
+        (RecallSource.FDA_DEVICE, "openfda/device_by_recall_number.json"),
+    ]:
+        records += openfda.parse_events(source, load_fixture(name)["results"])
+    with sessions.begin() as session:
+        store.upsert(session, records)
+    embed_missing(sessions, embedder, batch_size=64)
+    engine.dispose()
     return url

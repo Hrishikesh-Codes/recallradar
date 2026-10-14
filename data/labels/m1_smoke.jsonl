@@ -1,0 +1,53 @@
+{"id": "anker-a1263", "type": "text", "input": "Anker PowerCore 10000 power bank model A1263", "verdict": "check_unit", "recalls": ["cpsc:10311"], "why": "Model matches; only qualifying serial numbers are recalled."}
+{"id": "cuisinart-cgg6331", "type": "text", "input": "Cuisinart Propel+ gas grill CGG-6331", "verdict": "recalled", "recalls": ["cpsc:10853"], "why": "Model and brand match; every unit is recalled."}
+{"id": "peloton-pl01", "type": "text", "input": "Peloton bike PL01", "verdict": "recalled", "recalls": ["cpsc:9621"], "why": "All PL01 bikes are recalled."}
+{"id": "peloton-pl02", "type": "text", "input": "Peloton Bike+ PL02", "verdict": "check_unit", "recalls": ["cpsc:10467"], "why": "Only serial numbers beginning with T."}
+{"id": "rock-n-play", "type": "text", "input": "Fisher-Price Rock 'n Play sleeper", "verdict": "check_unit", "recalls": ["cpsc:8532", "cpsc:9494"], "why": "Name and brand match; no identifier given."}
+{"id": "ninja-op301", "type": "text", "input": "Ninja Foodi pressure cooker OP301", "verdict": "recalled", "recalls": ["cpsc:10257"], "why": "Ninja is SharkNinja's brand; model OP301 is listed; all units."}
+{"id": "lg-86uq8000aub", "type": "text", "input": "LG 86 inch TV 86UQ8000AUB", "verdict": "check_unit", "recalls": ["cpsc:9498"], "why": "Only serials beginning 202RM-208RM."}
+{"id": "samsung-wa50b5100aw", "type": "text", "input": "Samsung top load washer WA50B5100AW", "verdict": "check_unit", "recalls": ["cpsc:9486"], "why": "Serial ranges per model."}
+{"id": "onewheel-gt", "type": "text", "input": "Onewheel GT electric skateboard", "verdict": "check_unit", "recalls": ["cpsc:9727", "cpsc:9371"], "why": "Name and brand match."}
+{"id": "mamaroo", "type": "text", "input": "4moms MamaRoo baby swing", "verdict": "check_unit", "recalls": ["cpsc:9372"], "why": "Name and brand match."}
+{"id": "blendjet-2", "type": "text", "input": "BlendJet 2 portable blender", "verdict": "check_unit", "recalls": ["cpsc:9812"], "why": "Only some serial numbers."}
+{"id": "ikea-malm", "type": "text", "input": "IKEA MALM 6 drawer dresser", "verdict": "check_unit", "recalls": ["cpsc:7779", "cpsc:8186"], "why": "MALM is named in the recall title, not the product name."}
+{"id": "boppy-lounger", "type": "text", "input": "Boppy newborn lounger", "verdict": "check_unit", "recalls": ["cpsc:9147"], "why": "Name and brand match."}
+{"id": "sejov-dresser", "type": "text", "input": "SEJOV 5 drawer dresser", "verdict": "check_unit", "recalls": ["cpsc:10171"], "why": "Brand is the 'dba' name of the firm."}
+{"id": "favoto-helmet", "type": "text", "input": "Favoto bike helmet", "verdict": "check_unit", "recalls": ["cpsc:10758"], "why": "Name and brand match."}
+{"id": "aiper-seagull", "type": "text", "input": "Aiper Seagull Pro pool cleaner", "verdict": "check_unit", "recalls": ["cpsc:10205"], "why": "Firm name differs from the brand on the product."}
+{"id": "trankerloop-bath-seat", "type": "text", "input": "Trankerloop baby bath seat", "verdict": "check_unit", "recalls": ["cpsc:10631"], "why": "Name and brand match."}
+{"id": "ikea-kullen", "type": "text", "input": "IKEA KULLEN 3 drawer chest", "verdict": "check_unit", "recalls": ["cpsc:8759"], "why": "Name and brand match."}
+{"id": "hover1-helix", "type": "text", "input": "Hover-1 Helix hoverboard", "verdict": "check_unit", "recalls": ["cpsc:9806"], "why": "Only some colors and serials."}
+{"id": "zline-rg48", "type": "text", "input": "ZLINE 48 inch gas range RG48", "verdict": "recalled", "recalls": ["cpsc:9514"], "why": "Model listed; all units."}
+{"id": "a1263-model-only", "type": "text", "input": "A1263", "verdict": "check_unit", "recalls": ["cpsc:10311"], "why": "A distinctive model number alone, brand unconfirmed."}
+{"id": "link-blendjet", "type": "link", "input": "https://www.amazon.com/BlendJet-Portable-Blender-Rechargeable-Smoothies/dp/B000EXAMPL", "verdict": "check_unit", "recalls": ["cpsc:9812"], "why": "Constructed link in Amazon's format: slug only."}
+{"id": "link-mamaroo", "type": "link", "input": "https://www.target.com/p/4moms-mamaroo-multi-motion-baby-swing/-/A-00000000", "verdict": "check_unit", "recalls": ["cpsc:9372"], "why": "Constructed link in Target's format."}
+{"id": "link-cuisinart", "type": "link", "input": "https://www.homedepot.com/p/Cuisinart-Propel-Four-Burner-3-in-1-Gas-Grill-CGG-6331/000000000", "verdict": "recalled", "recalls": ["cpsc:10853"], "why": "Constructed link in Home Depot's format; model in slug."}
+{"id": "link-short", "type": "link", "input": "https://a.co/d/abc1234", "verdict": "unidentified", "recalls": [], "why": "Short links can't be read without visiting the page."}
+{"id": "upc-shakespeares-pizza", "type": "barcode", "input": "686148007370", "verdict": "recalled", "recalls": ["fda_food:93568"], "why": "UPC listed; all lots."}
+{"id": "upc-zenshi-sushi", "type": "barcode", "input": "023012942601", "verdict": "recalled", "recalls": ["fda_food:97019"], "why": "UPC listed; all lots."}
+{"id": "upc-valley-springs", "type": "barcode", "input": "031193013010", "verdict": "recalled", "recalls": ["fda_food:98410"], "why": "UPC listed; all codes."}
+{"id": "upc-earache-drops", "type": "barcode", "input": "311917217123", "verdict": "check_unit", "recalls": ["fda_drug:90297"], "why": "One lot only."}
+{"id": "upc-zapzyt", "type": "barcode", "input": "010768001102", "verdict": "check_unit", "recalls": ["fda_drug:96384"], "why": "Listed lots only."}
+{"id": "upc-unknown", "type": "barcode", "input": "036000291452", "verdict": "all_clear", "recalls": [], "why": "A valid UPC not listed in any recall (checked in the database)."}
+{"id": "dreamstation", "type": "text", "input": "Philips DreamStation CPAP", "verdict": "check_unit", "recalls": ["fda_device:88058", "fda_device:91837", "fda_device:97191"], "why": "Device recalls restricted by serial."}
+{"id": "snoo-sleep-sack", "type": "text", "input": "Happiest Baby SNOO sleep sack", "verdict": "check_unit", "recalls": ["fda_device:99608"], "why": "Name and brand match."}
+{"id": "ezricare", "type": "text", "input": "EzriCare artificial tears eye drops", "verdict": "check_unit", "recalls": ["fda_drug:91621"], "why": "Brand appears only in the product description."}
+{"id": "neg-le-creuset", "type": "text", "input": "Le Creuset dutch oven", "verdict": "all_clear", "recalls": [], "why": "No recall names this brand."}
+{"id": "neg-airpods", "type": "text", "input": "Apple AirPods Pro", "verdict": "all_clear", "recalls": [], "why": "No recall names this product."}
+{"id": "neg-switch", "type": "text", "input": "Nintendo Switch OLED", "verdict": "all_clear", "recalls": [], "why": "No recall names this product."}
+{"id": "neg-kindle", "type": "text", "input": "Kindle Paperwhite", "verdict": "all_clear", "recalls": [], "why": "No recall names this product."}
+{"id": "neg-hydro-flask", "type": "text", "input": "Hydro Flask 32 oz water bottle", "verdict": "all_clear", "recalls": [], "why": "Other bottle brands are recalled; this one isn't."}
+{"id": "neg-owala", "type": "text", "input": "Owala FreeSip water bottle", "verdict": "all_clear", "recalls": [], "why": "No recall names this brand."}
+{"id": "neg-nespresso", "type": "text", "input": "Nespresso Vertuo coffee maker", "verdict": "all_clear", "recalls": [], "why": "Other coffee makers are recalled; this one isn't."}
+{"id": "neg-roomba", "type": "text", "input": "iRobot Roomba robot vacuum", "verdict": "all_clear", "recalls": [], "why": "No recall names this brand."}
+{"id": "neg-lego", "type": "text", "input": "LEGO Classic bricks", "verdict": "all_clear", "recalls": [], "why": "No recall names this brand."}
+{"id": "neg-baby-brezza", "type": "text", "input": "Baby Brezza formula maker", "verdict": "all_clear", "recalls": [], "why": "Safety-critical category, brand never recalled."}
+{"id": "neg-halo-bassinest", "type": "text", "input": "Halo BassiNest swivel sleeper", "verdict": "all_clear", "recalls": [], "why": "Hard negative: HALO sleepsuits are recalled, not the BassiNest."}
+{"id": "neg-dr-bronners", "type": "text", "input": "Dr. Bronner's castile soap", "verdict": "all_clear", "recalls": [], "why": "No recall names this brand."}
+{"id": "cov-honda-civic", "type": "text", "input": "2019 Honda Civic", "verdict": "not_covered", "recalls": [], "why": "Vehicles are NHTSA's; Honda's CPSC recalls are lawn equipment."}
+{"id": "cov-car-seat", "type": "text", "input": "Graco 4Ever car seat", "verdict": "not_covered", "recalls": [], "why": "Car seats are NHTSA's."}
+{"id": "cov-bacon", "type": "text", "input": "Oscar Mayer bacon", "verdict": "not_covered", "recalls": [], "why": "Meat is USDA FSIS's."}
+{"id": "cov-tires", "type": "text", "input": "Michelin tires", "verdict": "not_covered", "recalls": [], "why": "Tires are NHTSA's."}
+{"id": "vague-blender", "type": "text", "input": "blender", "verdict": "unidentified", "recalls": [], "why": "Too vague to check."}
+{"id": "vague-chair", "type": "text", "input": "chair", "verdict": "unidentified", "recalls": [], "why": "Too vague to check."}
+{"id": "vague-toy", "type": "text", "input": "my kid's toy", "verdict": "unidentified", "recalls": [], "why": "Too vague to check."}

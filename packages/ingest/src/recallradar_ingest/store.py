@@ -1,23 +1,24 @@
 """Idempotent upserts of parsed recalls (SPEC §4.2).
 
 Recalls are keyed on (source, source_recall_id), products on (recall, source_product_id). A row
-whose content hash is unchanged is left alone; a changed product loses its embedding so the
-embed job recomputes it. Nothing is deleted: FDA events gain products week by week.
+whose content hash is unchanged is left alone. A changed product keeps its embedding unless the
+text it was computed from (name, brand, category) changed; then the embed job recomputes it.
+Nothing is deleted: FDA events gain products week by week.
 """
 
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, insert, select, text, update
+from sqlalchemy import case, func, insert, null, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from recallradar_core.db import Recall, RecallProduct
 from recallradar_core.enums import RecallSource
 from recallradar_ingest.records import ProductRecord, RecallRecord
 
-# Neon's free tier is 0.5 GB. Device recalls can list thousands of lot or serial codes; past these
-# caps the full list stays in the restriction text and on the official notice.
+# Neon's free plan stores 1 GB per project. Device recalls can list thousands of lot or serial
+# codes; past these caps the full list stays in the restriction text and on the official notice.
 MAX_CODES = 300
 MAX_WEAK_CODES = 100
 
@@ -148,10 +149,20 @@ def upsert(session: Session, records: Iterable[RecallRecord]) -> UpsertStats:
             elif found[1] == values["content_hash"]:
                 stats.products_unchanged += 1
             else:
+                # SET expressions see the row's old values.
+                text_changed = or_(
+                    RecallProduct.product_name.is_distinct_from(values["product_name"]),
+                    RecallProduct.brand.is_distinct_from(values["brand"]),
+                    RecallProduct.category.is_distinct_from(values["category"]),
+                )
                 session.execute(
                     update(RecallProduct)
                     .where(RecallProduct.id == found[0])
-                    .values(**values, embedding=None, updated_at=func.now())
+                    .values(
+                        **values,
+                        embedding=case((text_changed, null()), else_=RecallProduct.embedding),
+                        updated_at=func.now(),
+                    )
                 )
                 stats.products_updated += 1
     if to_insert:

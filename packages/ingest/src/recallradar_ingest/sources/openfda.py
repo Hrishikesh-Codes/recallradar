@@ -26,6 +26,7 @@ import httpx
 from recallradar_core.categories import Category, classify
 from recallradar_core.enums import RecallSource, RecallStatus
 from recallradar_ingest.extract import codes, restrictions
+from recallradar_ingest.extract.labelers import labelers
 from recallradar_ingest.extract.text import clean, truncate
 from recallradar_ingest.http import NotFoundError, get_json_with_links
 from recallradar_ingest.records import ProductRecord, RecallRecord, barcodes, split_barcodes
@@ -33,6 +34,7 @@ from recallradar_ingest.records import ProductRecord, RecallRecord, barcodes, sp
 URL = "https://api.fda.gov/{kind}/enforcement.json"
 PAGE_SIZE = 1000
 RAW_CODE_INFO_CHARS = 2000
+PRODUCT_NAME_CHARS = 2000
 EVENT_URL = "https://www.accessdata.fda.gov/scripts/ires/index.cfm?Event={event_id}"
 
 KINDS: dict[RecallSource, str] = {
@@ -116,6 +118,9 @@ def _short(description: str) -> str:
 
 def _compact_product(record: dict[str, Any]) -> dict[str, Any]:
     compact = {key: record.get(key) for key in _PRODUCT_FIELDS}
+    # The description is stored as the product name; keep it here only if that was truncated.
+    if len(clean(record.get("product_description"))) <= PRODUCT_NAME_CHARS:
+        compact.pop("product_description", None)
     code_info = record.get("code_info") or ""
     if len(code_info) > RAW_CODE_INFO_CHARS:
         compact["code_info"] = code_info[:RAW_CODE_INFO_CHARS]
@@ -145,8 +150,8 @@ def parse_product(source: RecallSource, record: dict[str, Any], firm: str) -> Pr
     models, coded_barcodes = split_barcodes(list(dict.fromkeys(described.models + scan.models)))
     return ProductRecord(
         source_product_id=str(record["recall_number"]),
-        product_name=truncate(description, 2000) or "Unnamed product",
-        brand=(openfda.get("brand_name") or [None])[0],
+        product_name=truncate(description, PRODUCT_NAME_CHARS) or "Unnamed product",
+        brand=(openfda.get("brand_name") or [None])[0] or next(iter(labelers(description)), None),
         manufacturer=firm,
         model_numbers=models,
         lot_codes=scan.lots,

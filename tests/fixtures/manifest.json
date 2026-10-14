@@ -12,6 +12,12 @@
   "note": "full window"
  },
  {
+  "file": "cpsc/provider_error.json",
+  "url": "https://www.saferproducts.gov/RestWebServices/Recall?format=json&RecallDateStart=2023-01-01&RecallDateEnd=2023-12-31",
+  "fetched_at": "2026-10-14T02:39:32.262940+00:00",
+  "note": "HTTP 200 with a placeholder record while CPSC's backend was failing"
+ },
+ {
   "file": "openfda/food_by_recall_number.json",
   "url": "https://api.fda.gov/food/enforcement.json?search=recall_number%3A%28%22H-1398-2026%22+%22H-1403-2026%22+%22H-1242-2026%22+%22H-1239-2026%22+%22H-1015-2026%22%29&limit=100",
   "fetched_at": "2026-10-13T23:27:24.062280+00:00",

@@ -127,6 +127,44 @@ class TestCpscFetch:
         with pytest.raises(cpsc.SuspiciousResponseError):
             list(cpsc.fetch(client, start=date(2025, 1, 1), end=date(2025, 1, 31)))
 
+    def test_provider_error_placeholder_is_retried_then_split(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Real response from 2026-10-14: HTTP 200 with one fake "Error retrieving Recalls" record.
+        error = load("cpsc/provider_error.json")
+        good = load("cpsc/last_publish_window.json")
+        monkeypatch.setattr(cpsc, "_sleep", lambda seconds: None)
+        seen: list[tuple[str, str]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            window = (request.url.params["RecallDateStart"], request.url.params["RecallDateEnd"])
+            seen.append(window)
+            # The whole year keeps failing; each half succeeds.
+            return httpx.Response(
+                200,
+                json=error if window[1] == "2023-12-31" and window[0] == "2023-01-01" else good[:3],
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        (batch,) = list(cpsc.fetch(client, start=date(2023, 1, 1), end=date(2023, 12, 31)))
+        assert len(batch) == 6
+        assert not cpsc.is_provider_error(batch)
+        assert seen == [("2023-01-01", "2023-12-31")] * cpsc.PROVIDER_ERROR_ATTEMPTS + [
+            ("2023-01-01", "2023-07-02"),
+            ("2023-07-03", "2023-12-31"),
+        ]
+
+    def test_provider_error_that_persists_fails_the_fetch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        error = load("cpsc/provider_error.json")
+        monkeypatch.setattr(cpsc, "_sleep", lambda seconds: None)
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, json=error))
+        )
+        with pytest.raises(cpsc.ProviderError):
+            list(cpsc.fetch(client, start=date(2023, 1, 1), end=date(2023, 1, 31)))
+
 
 class TestOpenFdaParse:
     def test_an_event_becomes_one_recall_with_its_products(self) -> None:

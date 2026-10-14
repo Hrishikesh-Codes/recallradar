@@ -393,6 +393,62 @@
     text-transform: uppercase;
   }
 
+  /* Hero radar: the WebGL canvas paints over a CSS dot field (shown if WebGL2 is missing). */
+  .radar-field {
+    background: radial-gradient(var(--color-muted-3) 1px, transparent 1.5px) 0 0 / 16px 16px;
+    mask-image: radial-gradient(ellipse at 78% 62%, black 20%, transparent 75%);
+  }
+
+  .radar-field::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 55%, var(--color-bg-0));
+    pointer-events: none;
+  }
+
+  /* "Checking" radar: hairline rings, dot field, and a rotating orange sweep. */
+  .radar-sweep {
+    position: relative;
+    width: clamp(7rem, 20vw, 10rem);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background:
+      radial-gradient(
+        circle,
+        transparent 0 32%,
+        var(--color-line) 32% calc(32% + 1px),
+        transparent 0
+      ),
+      radial-gradient(
+        circle,
+        transparent 0 65%,
+        var(--color-line) 65% calc(65% + 1px),
+        transparent 0
+      ),
+      radial-gradient(var(--color-muted-3) 1px, transparent 1.5px) 0 0 / 12px 12px;
+    box-shadow: inset 0 0 0 1px var(--color-line);
+    overflow: clip;
+  }
+
+  .radar-sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: conic-gradient(from 0deg, transparent 0 75%, rgb(255 157 0 / 0.55) 100%);
+    animation: radar-spin 1.6s linear infinite;
+  }
+
+  /* Scanner viewfinder: a dotted frame where the barcode should go. */
+  .scan-reticle {
+    position: absolute;
+    inset: 22% 12%;
+    border: 2px dotted var(--color-accent);
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 0 100vmax rgb(1 0 1 / 0.45);
+  }
+
   /* Masked line reveal. Lines are visible unless JS armed them while offscreen. */
   .reveal-line {
     display: block;
@@ -416,6 +472,12 @@
   [data-reveal="on-load"] .reveal-line__inner {
     animation: reveal-line-up var(--dur-reveal) var(--ease-reveal) both;
     animation-delay: calc(150ms + var(--line-index, 0) * 80ms);
+  }
+}
+
+@keyframes radar-spin {
+  to {
+    transform: rotate(1turn);
   }
 }
 
@@ -446,5 +508,10 @@
 
   [data-reveal="on-load"] .reveal-line__inner {
     animation: none;
+  }
+
+  .radar-sweep::after {
+    animation: none;
+    transform: rotate(0.3turn);
   }
 }

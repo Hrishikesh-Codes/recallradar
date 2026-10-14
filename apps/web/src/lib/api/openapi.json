@@ -1,6 +1,162 @@
 {
   "components": {
     "schemas": {
+      "Accepted": {
+        "properties": {
+          "status": {
+            "const": "accepted",
+            "default": "accepted",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "Accepted",
+        "type": "object"
+      },
+      "CheckInput": {
+        "properties": {
+          "type": {
+            "enum": [
+              "text",
+              "link",
+              "barcode"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "CheckInput",
+        "type": "object"
+      },
+      "CheckRequest": {
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/CheckInput"
+          },
+          "purchase_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overrides a date found in the input.",
+            "title": "Purchase Date"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "title": "CheckRequest",
+        "type": "object"
+      },
+      "CheckResponse": {
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "id": {
+            "description": "Quote this when sending feedback on the result.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/MatchOut"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "query": {
+            "$ref": "#/components/schemas/QueryOut"
+          },
+          "related": {
+            "items": {
+              "$ref": "#/components/schemas/MatchOut"
+            },
+            "title": "Related",
+            "type": "array"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Tier"
+          }
+        },
+        "required": [
+          "id",
+          "verdict",
+          "query",
+          "matches",
+          "related",
+          "coverage",
+          "notes"
+        ],
+        "title": "CheckResponse",
+        "type": "object"
+      },
+      "Coverage": {
+        "properties": {
+          "checked": {
+            "items": {
+              "$ref": "#/components/schemas/SourceCoverage"
+            },
+            "title": "Checked",
+            "type": "array"
+          },
+          "not_covered": {
+            "description": "Sources this product's category needs that we don't ingest yet.",
+            "items": {
+              "$ref": "#/components/schemas/RecallSource"
+            },
+            "title": "Not Covered",
+            "type": "array"
+          },
+          "recalls_checked": {
+            "title": "Recalls Checked",
+            "type": "integer"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "checked",
+          "not_covered",
+          "recalls_checked",
+          "updated_at"
+        ],
+        "title": "Coverage",
+        "type": "object"
+      },
       "Environment": {
         "enum": [
           "local",
@@ -9,6 +165,69 @@
         ],
         "title": "Environment",
         "type": "string"
+      },
+      "FeedbackRequest": {
+        "properties": {
+          "check_id": {
+            "format": "uuid",
+            "title": "Check Id",
+            "type": "string"
+          },
+          "label": {
+            "enum": [
+              "mine",
+              "not_mine",
+              "handled"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueryOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What was checked; stored as a matching label (SPEC \u00a76.7)."
+          },
+          "recall_id": {
+            "title": "Recall Id",
+            "type": "integer"
+          },
+          "tier_shown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Tier"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "check_id",
+          "recall_id",
+          "label"
+        ],
+        "title": "FeedbackRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
       },
       "Liveness": {
         "properties": {
@@ -22,6 +241,56 @@
           "status"
         ],
         "title": "Liveness",
+        "type": "object"
+      },
+      "MatchOut": {
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductOut"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "recall": {
+            "$ref": "#/components/schemas/RecallSummary"
+          },
+          "similarity": {
+            "description": "name similarity 0-1; 0 when matched by identifier only",
+            "title": "Similarity",
+            "type": "number"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Tier"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for related recalls that aren't a match"
+          },
+          "what_to_check": {
+            "items": {
+              "type": "string"
+            },
+            "title": "What To Check",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tier",
+          "recall",
+          "product",
+          "reasons",
+          "what_to_check",
+          "similarity"
+        ],
+        "title": "MatchOut",
         "type": "object"
       },
       "Meta": {
@@ -39,6 +308,217 @@
           "environment"
         ],
         "title": "Meta",
+        "type": "object"
+      },
+      "NoticeType": {
+        "enum": [
+          "recall",
+          "warning"
+        ],
+        "title": "NoticeType",
+        "type": "string"
+      },
+      "ProductOut": {
+        "properties": {
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "lot_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lot Codes",
+            "type": "array"
+          },
+          "model_numbers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Model Numbers",
+            "type": "array"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "restrictions": {
+            "items": {
+              "$ref": "#/components/schemas/Restriction"
+            },
+            "title": "Restrictions",
+            "type": "array"
+          },
+          "sold_end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold End Date"
+          },
+          "sold_start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Start Date"
+          },
+          "unit_restricted": {
+            "title": "Unit Restricted",
+            "type": "boolean"
+          },
+          "upcs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Upcs",
+            "type": "array"
+          },
+          "where_to_look": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Where To Look",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_name",
+          "brand",
+          "model_numbers",
+          "upcs",
+          "lot_codes",
+          "sold_start_date",
+          "sold_end_date",
+          "unit_restricted",
+          "restrictions",
+          "where_to_look",
+          "quantity"
+        ],
+        "title": "ProductOut",
+        "type": "object"
+      },
+      "QueryOut": {
+        "description": "How we read the input, so the user can correct it.",
+        "properties": {
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "input_type": {
+            "title": "Input Type",
+            "type": "string"
+          },
+          "lot_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lot Codes",
+            "type": "array"
+          },
+          "model_numbers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Model Numbers",
+            "type": "array"
+          },
+          "product_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Name"
+          },
+          "purchase_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Date"
+          },
+          "retailer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retailer"
+          },
+          "upcs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Upcs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "input_type",
+          "product_name",
+          "brand",
+          "model_numbers",
+          "upcs",
+          "lot_codes",
+          "purchase_date",
+          "retailer",
+          "categories"
+        ],
+        "title": "QueryOut",
         "type": "object"
       },
       "Readiness": {
@@ -61,6 +541,361 @@
           "database"
         ],
         "title": "Readiness",
+        "type": "object"
+      },
+      "RecallDetail": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "distribution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distribution"
+          },
+          "products": {
+            "items": {
+              "$ref": "#/components/schemas/ProductOut"
+            },
+            "title": "Products",
+            "type": "array"
+          },
+          "recall": {
+            "$ref": "#/components/schemas/RecallSummary"
+          }
+        },
+        "required": [
+          "recall",
+          "description",
+          "distribution",
+          "products"
+        ],
+        "title": "RecallDetail",
+        "type": "object"
+      },
+      "RecallSource": {
+        "enum": [
+          "cpsc",
+          "fda_food",
+          "fda_drug",
+          "fda_device",
+          "fsis",
+          "nhtsa"
+        ],
+        "title": "RecallSource",
+        "type": "string"
+      },
+      "RecallStatus": {
+        "enum": [
+          "ongoing",
+          "completed",
+          "terminated",
+          "unknown"
+        ],
+        "title": "RecallStatus",
+        "type": "string"
+      },
+      "RecallSummary": {
+        "properties": {
+          "classification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification"
+          },
+          "firm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firm"
+          },
+          "hazard": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hazard"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "notice_type": {
+            "$ref": "#/components/schemas/NoticeType"
+          },
+          "official_url": {
+            "title": "Official Url",
+            "type": "string"
+          },
+          "recall_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recall Date"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "remedy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remedy"
+          },
+          "remedy_type": {
+            "$ref": "#/components/schemas/RemedyType"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RecallSource"
+          },
+          "source_label": {
+            "description": "\"CPSC\", \"FDA\", ...",
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_recall_id": {
+            "title": "Source Recall Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RecallStatus"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "source_label",
+          "source_recall_id",
+          "reference",
+          "notice_type",
+          "title",
+          "hazard",
+          "remedy",
+          "remedy_type",
+          "recall_date",
+          "status",
+          "classification",
+          "firm",
+          "official_url",
+          "image_url"
+        ],
+        "title": "RecallSummary",
+        "type": "object"
+      },
+      "RemedyType": {
+        "enum": [
+          "refund",
+          "repair",
+          "replace",
+          "dispose",
+          "other"
+        ],
+        "title": "RemedyType",
+        "type": "string"
+      },
+      "Restriction": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "detail"
+        ],
+        "title": "Restriction",
+        "type": "object"
+      },
+      "SourceCoverage": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "recalls": {
+            "title": "Recalls",
+            "type": "integer"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RecallSource"
+          }
+        },
+        "required": [
+          "source",
+          "label",
+          "recalls",
+          "last_synced_at"
+        ],
+        "title": "SourceCoverage",
+        "type": "object"
+      },
+      "Stats": {
+        "properties": {
+          "products": {
+            "title": "Products",
+            "type": "integer"
+          },
+          "recalls": {
+            "title": "Recalls",
+            "type": "integer"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceCoverage"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "recalls",
+          "products",
+          "sources",
+          "updated_at"
+        ],
+        "title": "Stats",
+        "type": "object"
+      },
+      "Tier": {
+        "enum": [
+          "recalled",
+          "check_unit",
+          "all_clear",
+          "unidentified",
+          "not_covered"
+        ],
+        "title": "Tier",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
         "type": "object"
       }
     }
@@ -124,6 +959,99 @@
         ]
       }
     },
+    "/v1/check": {
+      "post": {
+        "description": "Check one product (typed description, product link, or barcode) against every recall.\n\nNo account needed. Nothing about the product is stored, only that a check happened.",
+        "operationId": "check_product_v1_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited; see Retry-After."
+          }
+        },
+        "summary": "Check Product",
+        "tags": [
+          "check"
+        ]
+      }
+    },
+    "/v1/feedback": {
+      "post": {
+        "description": "Record \"This is mine\", \"Not my product\", or \"Already handled\" for one match.",
+        "operationId": "feedback_v1_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown recall."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited; see Retry-After."
+          }
+        },
+        "summary": "Feedback",
+        "tags": [
+          "check"
+        ]
+      }
+    },
     "/v1/meta": {
       "get": {
         "operationId": "meta_v1_meta_get",
@@ -142,6 +1070,73 @@
         "summary": "Meta",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/recalls/{recall_id}": {
+      "get": {
+        "operationId": "get_recall_v1_recalls__recall_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recall_id",
+            "required": true,
+            "schema": {
+              "title": "Recall Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecallDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Recall",
+        "tags": [
+          "recalls"
+        ]
+      }
+    },
+    "/v1/stats": {
+      "get": {
+        "description": "What we check against: \"Checked against 31,482 recalls from CPSC and FDA\".",
+        "operationId": "stats_v1_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stats",
+        "tags": [
+          "recalls"
         ]
       }
     }

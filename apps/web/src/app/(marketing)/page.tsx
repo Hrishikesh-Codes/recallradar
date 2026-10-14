@@ -1,3 +1,6 @@
+import { RadarField } from "@/components/home/RadarField";
+import { RecallCounter } from "@/components/home/RecallCounter";
+import { TryIt } from "@/components/home/TryIt";
 import { OrbitIcon } from "@/components/icons";
 import { LineReveal } from "@/components/motion/LineReveal";
 import { ButtonLink } from "@/components/ui/Button";
@@ -18,12 +21,14 @@ const STEPS = [
   },
 ];
 
-/** M0 placeholder landing page; the radar hero and live check arrive in M1. */
 export default function HomePage() {
   return (
     <>
-      <section className="page-x flex min-h-svh flex-col justify-end pt-32 pb-16">
-        <p className="chip mb-8 self-start text-accent">In development · Milestone 0</p>
+      <section className="page-x relative isolate flex min-h-svh flex-col justify-end overflow-clip pt-32 pb-16">
+        <RadarField className="absolute inset-0 -z-10" />
+        <div className="mb-8">
+          <RecallCounter />
+        </div>
         <LineReveal
           as="h1"
           trigger="load"
@@ -41,11 +46,14 @@ export default function HomePage() {
             RecallRadar checks what you own against official U.S. recall notices, shows you the
             evidence, and keeps watching your list.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <ButtonLink href="/#how-it-works" variant="primary">
-              How it works
-            </ButtonLink>
-            <ButtonLink href="/dev">Design system</ButtonLink>
+          <div className="flex w-full max-w-xl flex-col gap-4">
+            <TryIt />
+            <div className="flex flex-wrap gap-3">
+              <ButtonLink href="/check">Scan a barcode</ButtonLink>
+              <ButtonLink href="/#how-it-works" arrow={false}>
+                How it works
+              </ButtonLink>
+            </div>
           </div>
         </div>
       </section>

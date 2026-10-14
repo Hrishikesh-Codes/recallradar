@@ -5,14 +5,16 @@ from collections.abc import Iterable
 
 from recallradar_core.categories import _KEYWORDS
 
-_TOKEN = re.compile(r"[a-z0-9]+(?:'[a-z]+)?")
+_TOKEN = re.compile(r"[a-z0-9]+")
+_POSSESSIVE = re.compile(r"['\u2019]s\b")
 
 # Words that describe what a product is (or are filler), so sharing them says nothing about
 # whether two products come from the same brand.
 _STOP = frozenset(
     """
     a an and are as at be but by for from has have in into is it its of on or our the their this
-    to with without your you new old set pack kit piece pieces pcs inch inches in oz lb lbs ft
+    to with without your you my me mine we i new old used set pack kit piece pieces pcs inch inches
+    in oz lb lbs ft
     size small medium large xl mini plus pro max ultra series model models edition version
     black white gray grey silver gold red blue green pink purple orange yellow brown beige clear
     product products item items brand brands type style color colour bought purchased sold
@@ -47,7 +49,8 @@ GENERIC = _STOP | _PRODUCT_WORDS
 
 
 def tokens(text: str | None) -> list[str]:
-    return _TOKEN.findall((text or "").lower().replace("-", " "))
+    """Lowercase words and numbers; possessives dropped ("kid's" -> "kid")."""
+    return _TOKEN.findall(_POSSESSIVE.sub("", (text or "").lower()).replace("-", " "))
 
 
 def distinctive_tokens(text: str | None) -> set[str]:

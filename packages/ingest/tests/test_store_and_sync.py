@@ -56,9 +56,12 @@ def test_upsert_is_idempotent_and_detects_changes(sessions: sessionmaker[Session
     changed = cpsc.parse(load("cpsc/recalls_by_id.json")[0])
     changed.products[0].product_name += " (corrected)"
     changed.raw["Title"] = "edited"
+    # A change that doesn't touch the embedded text (name, brand, category) keeps the embedding.
+    requantified = cpsc.parse(load("cpsc/recalls_by_id.json")[1])
+    requantified.products[0].quantity = "About 1 (edited)"
     with sessions.begin() as session:
-        result = store.upsert(session, [changed])
-    assert (result.recalls_updated, result.products_updated) == (1, 1)
+        result = store.upsert(session, [changed, requantified])
+    assert (result.recalls_updated, result.products_updated) == (1, 2)
     with sessions() as session:
         embeddings = session.execute(
             select(RecallProduct.product_name, RecallProduct.embedding)

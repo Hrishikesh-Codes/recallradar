@@ -12,6 +12,17 @@ class RecallSource(StrEnum):
     NHTSA = "nhtsa"
 
 
+# How sources are named to users: "Checked against ... from CPSC and FDA".
+SOURCE_LABELS: dict[RecallSource, str] = {
+    RecallSource.CPSC: "CPSC",
+    RecallSource.FDA_FOOD: "FDA",
+    RecallSource.FDA_DRUG: "FDA",
+    RecallSource.FDA_DEVICE: "FDA",
+    RecallSource.FSIS: "USDA FSIS",
+    RecallSource.NHTSA: "NHTSA",
+}
+
+
 class NoticeType(StrEnum):
     RECALL = "recall"
     # CPSC "warns consumers" when a firm won't agree to a recall. Not a recall: never call it one.

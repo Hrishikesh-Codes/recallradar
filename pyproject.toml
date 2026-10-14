@@ -61,6 +61,7 @@ addopts = "-ra --strict-markers --import-mode=importlib"
 markers = [
   "db: needs a Postgres database (DATABASE_URL); skipped when unavailable",
   "live: calls a real external API; skipped unless RUN_LIVE_TESTS=1",
+  "model: loads the embedding model (downloaded once, ~67 MB, to the model cache)",
 ]
 testpaths = ["packages", "apps/api", "jobs", "tests"]
 

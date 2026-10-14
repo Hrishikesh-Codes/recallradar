@@ -4,11 +4,18 @@ fastembed runs the same model as sentence-transformers without PyTorch, which ke
 image small and its cold start fast on Hugging Face's free CPU (see DECISIONS.md).
 """
 
+import logging
 from collections.abc import Iterable, Sequence
 from functools import cached_property
 from pathlib import Path
 
 from fastembed import TextEmbedding
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session, sessionmaker
+
+from recallradar_core.db import Recall, RecallProduct
+
+logger = logging.getLogger("recallradar.matching.embed")
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 DIMENSIONS = 384
@@ -58,3 +65,46 @@ class Embedder:
 
     def queries(self, texts: Iterable[str]) -> list[list[float]]:
         return [v.tolist() for v in self._model.query_embed([t[:_MAX_CHARS] for t in texts])]
+
+
+def embed_missing(
+    sessions: sessionmaker[Session],
+    embedder: Embedder,
+    batch_size: int = 512,
+    limit: int | None = None,
+) -> int:
+    """Embed recall products that have no embedding yet; returns how many were embedded."""
+    done = 0
+    while limit is None or done < limit:
+        with sessions.begin() as session:
+            rows = session.execute(
+                select(
+                    RecallProduct.id,
+                    RecallProduct.product_name,
+                    RecallProduct.brand,
+                    Recall.firm,
+                    RecallProduct.category,
+                )
+                .join(Recall, Recall.id == RecallProduct.recall_id)
+                .where(RecallProduct.embedding.is_(None))
+                .order_by(RecallProduct.id)
+                .limit(batch_size if limit is None else min(batch_size, limit - done))
+            ).all()
+            if not rows:
+                break
+            vectors = embedder.passages(
+                [
+                    product_text(name, brand or firm, category)
+                    for _, name, brand, firm, category in rows
+                ]
+            )
+            session.execute(
+                update(RecallProduct),
+                [
+                    {"id": row.id, "embedding": vector}
+                    for row, vector in zip(rows, vectors, strict=True)
+                ],
+            )
+            done += len(rows)
+        logger.info("embedded", extra={"products": done})
+    return done

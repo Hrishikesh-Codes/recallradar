@@ -43,3 +43,6 @@ models/
 
 # Private project brief (kept local, not published)
 SPEC.md
+
+# Copied from node_modules by apps/web/scripts/copy-wasm.mjs
+apps/web/public/wasm/

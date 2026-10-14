@@ -38,7 +38,7 @@ export const VERDICTS: Record<Verdict, VerdictStyle> = {
     colorClass: "text-accent",
     Icon: CheckUnitIcon,
     meaning:
-      "A recall covers this product family, but only some models, lots, or dates. Check the label.",
+      "A recall may cover your product. Compare the details below with your label to be sure.",
   },
   all_clear: {
     label: "All clear",

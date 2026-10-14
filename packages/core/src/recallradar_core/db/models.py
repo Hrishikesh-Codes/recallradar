@@ -7,6 +7,7 @@ from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Computed,
     ForeignKey,
     Identity,
@@ -30,7 +31,7 @@ from recallradar_core.enums import (
     SyncStatus,
 )
 
-# BAAI/bge-small-en-v1.5 output size. Stored as halfvec (2 bytes/dim) to fit Neon's 0.5 GB tier.
+# BAAI/bge-small-en-v1.5 output size. Stored as halfvec (2 bytes/dim): half the space of vector.
 EMBEDDING_DIM = 384
 NAME_PREFIX_CHARS = 200
 
@@ -229,3 +230,45 @@ class Event(Base):
     properties: Mapped[dict[str, Any]] = mapped_column(server_default=_EMPTY_JSONB)
 
     __table_args__ = (Index(None, "name", "occurred_at"),)
+
+
+class BarcodeLookup(Base):
+    """Cached product lookups by barcode (Open Food Facts), so a barcode is fetched once.
+
+    `found` is false for barcodes the lookup service doesn't know; those are cached too, for
+    less time (see recallradar_api.checking).
+    """
+
+    __tablename__ = "barcode_lookup"
+
+    gtin14: Mapped[str] = mapped_column(primary_key=True)
+    source: Mapped[str]
+    found: Mapped[bool] = mapped_column(Boolean)
+    product_name: Mapped[str | None]
+    brand: Mapped[str | None]
+    is_food: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    fetched_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class Feedback(Base):
+    """A user's answer about one match: "This is mine", "Not my product", "Already handled".
+
+    Stored as a matching label (SPEC §6.7) with what was checked, never with who checked it.
+    """
+
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    check_id: Mapped[str]
+    recall_id: Mapped[int | None] = mapped_column(
+        ForeignKey("recall.id", ondelete="SET NULL"), index=True
+    )
+    label: Mapped[str]
+    tier_shown: Mapped[str | None]
+    query: Mapped[dict[str, Any]] = mapped_column(server_default=_EMPTY_JSONB)
+
+    __table_args__ = (
+        CheckConstraint("label IN ('mine', 'not_mine', 'handled')", name="label"),
+        UniqueConstraint("check_id", "recall_id"),
+    )

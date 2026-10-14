@@ -6,10 +6,14 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastembed>=0.9",
     "recallradar-core",
+    "recallradar-identify",
+    "recallradar-ingest",
 ]
 
 [tool.uv.sources]
 recallradar-core = { workspace = true }
+recallradar-identify = { workspace = true }
+recallradar-ingest = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]

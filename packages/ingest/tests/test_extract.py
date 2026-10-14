@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from recallradar_ingest.extract import codes, dates, gtin, restrictions
+from recallradar_ingest.extract import codes, dates, gtin, labelers, restrictions
 from recallradar_ingest.extract.codes import CodeKind, DateKind
 from recallradar_ingest.extract.restrictions import RestrictionKind
 from recallradar_ingest.extract.text import clean, code_key
@@ -223,7 +223,28 @@ class TestRestrictions:
             "June 2023 are included."
         )
         found = restrictions.cpsc_restrictions(text, codes.scan(text))
-        assert RestrictionKind.DATE_CODE in {r.kind for r in found}
+        (date_code,) = [r for r in found if r.kind is RestrictionKind.DATE_CODE]
+        assert date_code.detail.startswith("Only magic wands")
+
+    def test_cpsc_where_the_serial_is_printed_is_not_a_restriction(self) -> None:
+        # CPSC recall 10853 (Cuisinart CGG-6331): every unit is recalled.
+        text = (
+            "This recall includes the stainless-steel Cuisinart Propel+ Four Burner 3-in-1 Gas "
+            "Grill. The model number CGG-6331 can be found on the label on the inside of the "
+            "right-hand metal door, along with the serial number."
+        )
+        assert restrictions.cpsc_restrictions(text, codes.scan(text)) == []
+
+    def test_cpsc_serial_restriction_uses_the_sentence_that_restricts(self) -> None:
+        # CPSC recall 10311 (Anker A1263).
+        text = (
+            'The model number "A1263" and serial number "SN" are printed on the bottom. '
+            "Only model number A1263 power banks sold in the U.S. with qualifying serial numbers "
+            "are included in the recall."
+        )
+        found = restrictions.cpsc_restrictions(text, codes.scan(text))
+        (serial,) = [r for r in found if r.kind is RestrictionKind.SERIAL]
+        assert serial.detail.startswith("Only model number A1263")
 
     def test_cpsc_all_lots_included_is_not_a_restriction(self) -> None:
         text = (
@@ -248,3 +269,29 @@ class TestRestrictions:
         assert restrictions.where_to_look(text) == [
             "The model number is printed on a white label on the left side of the unit."
         ]
+
+
+class TestLabelers:
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            # Real openFDA product descriptions (drug recall 91621, food and drug samples).
+            (
+                "Artificial Tears Lubricant Eye Drops, 1/2 fl oz (15 ml) bottle, Distributed by. "
+                "EzriCare, LLC, Lakewood, NJ, NDC 79503-0101-15.",
+                ["EzriCare"],
+            ),
+            ("Distributed by: Walgreen Co., 200 Wilmot Rd., Deerfield, IL 60015", ["Walgreen"]),
+            ("DISTRIBUTED BY THE KROGER CO., CINCINNATI, OHIO 45202.", ["THE KROGER"]),
+            (
+                "Manufactured by: Wockhardt Limited, Mumbai, India. Distributed by: Wockhardt "
+                "USA LLC, Parsippany, NJ",
+                ["Wockhardt"],  # "USA" and "LLC" are dropped, so the two names are one
+            ),
+            ("Packed for: Mrs. Gerry's, Albert Lea, MN 56007", ["Mrs. Gerry's"]),
+            ("Dist. by: Target Corporation, Minneapolis, MN 55403.", ["Target"]),
+            ("Spicy Tuna Roll, 7.8oz, Keep refrigerated", []),
+        ],
+    )
+    def test_labelers(self, text: str, expected: list[str]) -> None:
+        assert labelers.labelers(text) == expected

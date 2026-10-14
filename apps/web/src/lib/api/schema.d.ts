@@ -41,6 +41,48 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Check Product
+     * @description Check one product (typed description, product link, or barcode) against every recall.
+     *
+     *     No account needed. Nothing about the product is stored, only that a check happened.
+     */
+    post: operations["check_product_v1_check_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/feedback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Feedback
+     * @description Record "This is mine", "Not my product", or "Already handled" for one match.
+     */
+    post: operations["feedback_v1_feedback_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/meta": {
     parameters: {
       query?: never;
@@ -58,15 +100,135 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/recalls/{recall_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Recall */
+    get: operations["get_recall_v1_recalls__recall_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Stats
+     * @description What we check against: "Checked against 31,482 recalls from CPSC and FDA".
+     */
+    get: operations["stats_v1_stats_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** Accepted */
+    Accepted: {
+      /**
+       * Status
+       * @default accepted
+       * @constant
+       */
+      status: "accepted";
+    };
+    /** CheckInput */
+    CheckInput: {
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: "text" | "link" | "barcode";
+      /** Value */
+      value: string;
+    };
+    /** CheckRequest */
+    CheckRequest: {
+      input: components["schemas"]["CheckInput"];
+      /**
+       * Purchase Date
+       * @description Overrides a date found in the input.
+       */
+      purchase_date?: string | null;
+    };
+    /** CheckResponse */
+    CheckResponse: {
+      coverage: components["schemas"]["Coverage"];
+      /**
+       * Id
+       * Format: uuid
+       * @description Quote this when sending feedback on the result.
+       */
+      id: string;
+      /** Matches */
+      matches: components["schemas"]["MatchOut"][];
+      /** Notes */
+      notes: string[];
+      query: components["schemas"]["QueryOut"];
+      /** Related */
+      related: components["schemas"]["MatchOut"][];
+      verdict: components["schemas"]["Tier"];
+    };
+    /** Coverage */
+    Coverage: {
+      /** Checked */
+      checked: components["schemas"]["SourceCoverage"][];
+      /**
+       * Not Covered
+       * @description Sources this product's category needs that we don't ingest yet.
+       */
+      not_covered: components["schemas"]["RecallSource"][];
+      /** Recalls Checked */
+      recalls_checked: number;
+      /** Updated At */
+      updated_at: string | null;
+    };
     /**
      * Environment
      * @enum {string}
      */
     Environment: "local" | "test" | "production";
+    /** FeedbackRequest */
+    FeedbackRequest: {
+      /**
+       * Check Id
+       * Format: uuid
+       */
+      check_id: string;
+      /**
+       * Label
+       * @enum {string}
+       */
+      label: "mine" | "not_mine" | "handled";
+      /** @description What was checked; stored as a matching label (SPEC §6.7). */
+      query?: components["schemas"]["QueryOut"] | null;
+      /** Recall Id */
+      recall_id: number;
+      tier_shown?: components["schemas"]["Tier"] | null;
+    };
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components["schemas"]["ValidationError"][];
+    };
     /** Liveness */
     Liveness: {
       /**
@@ -75,11 +237,81 @@ export interface components {
        */
       status: "ok";
     };
+    /** MatchOut */
+    MatchOut: {
+      product: components["schemas"]["ProductOut"];
+      /** Reasons */
+      reasons: string[];
+      recall: components["schemas"]["RecallSummary"];
+      /**
+       * Similarity
+       * @description name similarity 0-1; 0 when matched by identifier only
+       */
+      similarity: number;
+      /** @description null for related recalls that aren't a match */
+      tier: components["schemas"]["Tier"] | null;
+      /** What To Check */
+      what_to_check: string[];
+    };
     /** Meta */
     Meta: {
       environment: components["schemas"]["Environment"];
       /** Version */
       version: string;
+    };
+    /**
+     * NoticeType
+     * @enum {string}
+     */
+    NoticeType: "recall" | "warning";
+    /** ProductOut */
+    ProductOut: {
+      /** Brand */
+      brand: string | null;
+      /** Lot Codes */
+      lot_codes: string[];
+      /** Model Numbers */
+      model_numbers: string[];
+      /** Product Name */
+      product_name: string;
+      /** Quantity */
+      quantity: string | null;
+      /** Restrictions */
+      restrictions: components["schemas"]["Restriction"][];
+      /** Sold End Date */
+      sold_end_date: string | null;
+      /** Sold Start Date */
+      sold_start_date: string | null;
+      /** Unit Restricted */
+      unit_restricted: boolean;
+      /** Upcs */
+      upcs: string[];
+      /** Where To Look */
+      where_to_look: string[];
+    };
+    /**
+     * QueryOut
+     * @description How we read the input, so the user can correct it.
+     */
+    QueryOut: {
+      /** Brand */
+      brand: string | null;
+      /** Categories */
+      categories: string[];
+      /** Input Type */
+      input_type: string;
+      /** Lot Codes */
+      lot_codes: string[];
+      /** Model Numbers */
+      model_numbers: string[];
+      /** Product Name */
+      product_name: string | null;
+      /** Purchase Date */
+      purchase_date: string | null;
+      /** Retailer */
+      retailer: string | null;
+      /** Upcs */
+      upcs: string[];
     };
     /** Readiness */
     Readiness: {
@@ -90,6 +322,111 @@ export interface components {
        * @enum {string}
        */
       status: "ok" | "unavailable";
+    };
+    /** RecallDetail */
+    RecallDetail: {
+      /** Description */
+      description: string | null;
+      /** Distribution */
+      distribution: string | null;
+      /** Products */
+      products: components["schemas"]["ProductOut"][];
+      recall: components["schemas"]["RecallSummary"];
+    };
+    /**
+     * RecallSource
+     * @enum {string}
+     */
+    RecallSource: "cpsc" | "fda_food" | "fda_drug" | "fda_device" | "fsis" | "nhtsa";
+    /**
+     * RecallStatus
+     * @enum {string}
+     */
+    RecallStatus: "ongoing" | "completed" | "terminated" | "unknown";
+    /** RecallSummary */
+    RecallSummary: {
+      /** Classification */
+      classification: string | null;
+      /** Firm */
+      firm: string | null;
+      /** Hazard */
+      hazard: string | null;
+      /** Id */
+      id: number;
+      /** Image Url */
+      image_url: string | null;
+      notice_type: components["schemas"]["NoticeType"];
+      /** Official Url */
+      official_url: string;
+      /** Recall Date */
+      recall_date: string | null;
+      /** Reference */
+      reference: string | null;
+      /** Remedy */
+      remedy: string | null;
+      remedy_type: components["schemas"]["RemedyType"];
+      source: components["schemas"]["RecallSource"];
+      /**
+       * Source Label
+       * @description "CPSC", "FDA", ...
+       */
+      source_label: string;
+      /** Source Recall Id */
+      source_recall_id: string;
+      status: components["schemas"]["RecallStatus"];
+      /** Title */
+      title: string;
+    };
+    /**
+     * RemedyType
+     * @enum {string}
+     */
+    RemedyType: "refund" | "repair" | "replace" | "dispose" | "other";
+    /** Restriction */
+    Restriction: {
+      /** Detail */
+      detail: string;
+      /** Kind */
+      kind: string;
+    };
+    /** SourceCoverage */
+    SourceCoverage: {
+      /** Label */
+      label: string;
+      /** Last Synced At */
+      last_synced_at: string | null;
+      /** Recalls */
+      recalls: number;
+      source: components["schemas"]["RecallSource"];
+    };
+    /** Stats */
+    Stats: {
+      /** Products */
+      products: number;
+      /** Recalls */
+      recalls: number;
+      /** Sources */
+      sources: components["schemas"]["SourceCoverage"][];
+      /** Updated At */
+      updated_at: string | null;
+    };
+    /**
+     * Tier
+     * @enum {string}
+     */
+    Tier: "recalled" | "check_unit" | "all_clear" | "unidentified" | "not_covered";
+    /** ValidationError */
+    ValidationError: {
+      /** Context */
+      ctx?: Record<string, never>;
+      /** Input */
+      input?: unknown;
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
     };
   };
   responses: never;
@@ -149,6 +486,93 @@ export interface operations {
       };
     };
   };
+  check_product_v1_check_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CheckResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Rate limited; see Retry-After. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  feedback_v1_feedback_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FeedbackRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Accepted"];
+        };
+      };
+      /** @description Unknown recall. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Rate limited; see Retry-After. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   meta_v1_meta_get: {
     parameters: {
       query?: never;
@@ -165,6 +589,64 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["Meta"];
+        };
+      };
+    };
+  };
+  get_recall_v1_recalls__recall_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        recall_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RecallDetail"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  stats_v1_stats_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Stats"];
         };
       };
     };

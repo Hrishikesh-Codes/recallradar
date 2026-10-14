@@ -46,6 +46,16 @@ def _recall(source_recall_id: str = "24-123", **overrides: object) -> Recall:
     return Recall(**fields)
 
 
+def _product(**overrides: object) -> RecallProduct:
+    fields: dict[str, object] = {
+        "source_product_id": "1",
+        "product_name": "Infant Sleeper Rocker",
+        "content_hash": "0" * 64,
+    }
+    fields.update(overrides)
+    return RecallProduct(**fields)
+
+
 def test_models_match_migrations(engine: Engine) -> None:
     with engine.connect() as connection:
         diff = compare_metadata(MigrationContext.configure(connection), Base.metadata)
@@ -85,12 +95,7 @@ def test_unknown_source_is_rejected_by_the_database(session: Session) -> None:
 def test_product_search_text_and_embedding_roundtrip(session: Session) -> None:
     recall = _recall()
     recall.products.append(
-        RecallProduct(
-            product_name="Infant Sleeper Rocker",
-            brand="Example Brand",
-            model_numbers=["FP-1234"],
-            embedding=[0.5] * EMBEDDING_DIM,
-        )
+        _product(brand="Example Brand", model_keys=["FP1234"], embedding=[0.5] * EMBEDDING_DIM)
     )
     session.add(recall)
     session.flush()
@@ -104,12 +109,13 @@ def test_product_search_text_and_embedding_roundtrip(session: Session) -> None:
 
     stored = session.scalar(select(RecallProduct.embedding))
     assert stored == [0.5] * EMBEDDING_DIM
-    assert session.scalar(select(RecallProduct.model_numbers)) == ["FP-1234"]
+    assert session.scalar(select(RecallProduct.model_keys)) == ["FP1234"]
+    assert session.scalar(select(RecallProduct.restrictions)) == []
 
 
 def test_deleting_a_recall_deletes_its_products(session: Session) -> None:
     recall = _recall()
-    recall.products.append(RecallProduct(product_name="Rocker"))
+    recall.products.append(_product(product_name="Rocker"))
     session.add(recall)
     session.flush()
 

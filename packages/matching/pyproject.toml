@@ -3,7 +3,10 @@ name = "recallradar-matching"
 version = "0.1.0"
 description = "Product <-> recall matching: normalization, candidate generation, scoring, calibration, eval."
 requires-python = ">=3.12,<3.13"
-dependencies = ["recallradar-core"]
+dependencies = [
+    "fastembed>=0.9",
+    "recallradar-core",
+]
 
 [tool.uv.sources]
 recallradar-core = { workspace = true }

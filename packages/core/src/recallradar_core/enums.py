@@ -12,6 +12,12 @@ class RecallSource(StrEnum):
     NHTSA = "nhtsa"
 
 
+class NoticeType(StrEnum):
+    RECALL = "recall"
+    # CPSC "warns consumers" when a firm won't agree to a recall. Not a recall: never call it one.
+    WARNING = "warning"
+
+
 class RemedyType(StrEnum):
     REFUND = "refund"
     REPAIR = "repair"

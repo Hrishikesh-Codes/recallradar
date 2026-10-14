@@ -3,10 +3,16 @@ name = "recallradar-jobs"
 version = "0.1.0"
 description = "Scheduled job entrypoints (sync -> match -> alert), run by GitHub Actions cron"
 requires-python = ">=3.12,<3.13"
-dependencies = ["recallradar-core"]
+dependencies = ["recallradar-core", "recallradar-ingest", "recallradar-matching"]
+
+[project.scripts]
+recallradar-sync = "recallradar_jobs.sync_cli:main"
+recallradar-embed = "recallradar_jobs.embed_cli:main"
 
 [tool.uv.sources]
 recallradar-core = { workspace = true }
+recallradar-ingest = { workspace = true }
+recallradar-matching = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]

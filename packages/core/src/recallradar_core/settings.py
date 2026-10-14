@@ -2,6 +2,7 @@
 
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 from pydantic import field_validator
@@ -23,6 +24,10 @@ class Settings(BaseSettings):
     database_url: str = LOCAL_DATABASE_URL
     log_level: str = "INFO"
     sentry_dsn: str | None = None
+    # Where downloaded ML models (embeddings) are cached. The API image bakes them in.
+    model_cache_dir: Path = Path.home() / ".cache" / "recallradar" / "models"
+    # Optional: raises openFDA's limit from 1,000 to 120,000 requests/day.
+    openfda_api_key: str | None = None
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
 
     @field_validator("database_url")

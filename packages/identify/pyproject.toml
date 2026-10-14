@@ -3,10 +3,11 @@ name = "recallradar-identify"
 version = "0.1.0"
 description = "Input handling: barcode, label photo, screenshot, link, text, VIN -> ProductQuery."
 requires-python = ">=3.12,<3.13"
-dependencies = ["recallradar-core"]
+dependencies = ["httpx>=0.28", "pydantic>=2.14", "recallradar-core", "recallradar-ingest"]
 
 [tool.uv.sources]
 recallradar-core = { workspace = true }
+recallradar-ingest = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]

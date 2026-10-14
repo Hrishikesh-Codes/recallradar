@@ -6,6 +6,7 @@ from typing import Any
 from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Computed,
     ForeignKey,
     Identity,
@@ -15,12 +16,13 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from recallradar_core.db.base import Base, TimestampMixin, str_enum
 from recallradar_core.enums import (
     ChunkSection,
+    NoticeType,
     RecallSource,
     RecallStatus,
     RemedyType,
@@ -30,9 +32,11 @@ from recallradar_core.enums import (
 
 # BAAI/bge-small-en-v1.5 output size. Stored as halfvec (2 bytes/dim) to fit Neon's 0.5 GB tier.
 EMBEDDING_DIM = 384
+NAME_PREFIX_CHARS = 200
 
 _EMPTY_TEXT_ARRAY = text("'{}'::text[]")
 _EMPTY_JSONB = text("'{}'::jsonb")
+_EMPTY_JSONB_ARRAY = text("'[]'::jsonb")
 
 
 class Recall(TimestampMixin, Base):
@@ -41,18 +45,29 @@ class Recall(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     source: Mapped[RecallSource] = mapped_column(str_enum(RecallSource, "source"))
     source_recall_id: Mapped[str]
+    # Human-facing number: CPSC recall number ("26227") or FDA event ID ("99887").
+    reference: Mapped[str | None]
+    notice_type: Mapped[NoticeType] = mapped_column(
+        str_enum(NoticeType, "notice_type"), server_default=NoticeType.RECALL.value
+    )
     title: Mapped[str]
     description: Mapped[str | None]
     hazard: Mapped[str | None]
     remedy: Mapped[str | None]
     remedy_type: Mapped[RemedyType | None] = mapped_column(str_enum(RemedyType, "remedy_type"))
     recall_date: Mapped[date | None]
+    # When the notice became public: CPSC recall date, FDA enforcement report date.
+    published_date: Mapped[date | None]
     # Last-modified time as reported by the source, not by us.
     last_updated: Mapped[datetime | None]
     status: Mapped[RecallStatus] = mapped_column(
         str_enum(RecallStatus, "status"), server_default=RecallStatus.UNKNOWN.value
     )
     official_url: Mapped[str | None]
+    firm: Mapped[str | None]
+    # FDA hazard class: "Class I" (most serious) to "Class III".
+    classification: Mapped[str | None]
+    distribution: Mapped[str | None]
     raw: Mapped[dict[str, Any]]
     # sha256 of the canonicalised raw record: an upsert with the same hash is a no-op.
     content_hash: Mapped[str]
@@ -69,6 +84,7 @@ class Recall(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("source", "source_recall_id"),
         Index(None, "recall_date"),
+        Index(None, "published_date"),
     )
 
 
@@ -79,16 +95,36 @@ class RecallProduct(TimestampMixin, Base):
     recall_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("recall.id", ondelete="CASCADE"), index=True
     )
+    # FDA recall number ("H-1404-2026"); CPSC recall ID (one product per recall).
+    source_product_id: Mapped[str]
     product_name: Mapped[str]
     brand: Mapped[str | None]
     manufacturer: Mapped[str | None]
+    # Identifiers as printed, for display ...
     model_numbers: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
-    upcs: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
     lot_codes: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
+    # ... and normalised for exact matching ("WD-123.a" -> "WD123A"). GTIN-14 for barcodes.
+    upcs: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
+    model_keys: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
+    lot_keys: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
+    # Codes from flattened tables, column unknown: candidates only, never a confirmed match.
+    weak_model_keys: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
     sold_start_date: Mapped[date | None]
     sold_end_date: Mapped[date | None]
     retailers: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
     category: Mapped[str | None]
+    categories: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
+    safety_critical: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # True when only some lots/dates/serials are recalled: an identifier match is then
+    # "check your unit", never "recalled" (SPEC §6.4).
+    unit_restricted: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    restrictions: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, server_default=_EMPTY_JSONB_ARRAY
+    )
+    where_to_look: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
+    quantity: Mapped[str | None]
+    raw: Mapped[dict[str, Any] | None]
+    content_hash: Mapped[str]
     search_text: Mapped[str] = mapped_column(
         TSVECTOR,
         Computed(
@@ -104,14 +140,25 @@ class RecallProduct(TimestampMixin, Base):
     recall: Mapped[Recall] = relationship(back_populates="products")
 
     __table_args__ = (
+        UniqueConstraint("recall_id", "source_product_id"),
         Index(None, "search_text", postgresql_using="gin"),
-        Index(None, "model_numbers", postgresql_using="gin"),
         Index(None, "upcs", postgresql_using="gin"),
+        Index(None, "model_keys", postgresql_using="gin"),
+        Index(None, "weak_model_keys", postgresql_using="gin"),
+        Index(None, "lot_keys", postgresql_using="gin"),
+        # Fuzzy name matching looks at the first 200 characters only (FDA descriptions run to
+        # 2,000), which keeps this index small. Queries must use the same expression.
         Index(
-            "ix_recall_product_product_name_trgm",
-            "product_name",
+            "ix_recall_product_name_prefix_trgm",
+            text(f"left(product_name, {NAME_PREFIX_CHARS}) gin_trgm_ops"),
             postgresql_using="gin",
-            postgresql_ops={"product_name": "gin_trgm_ops"},
+        ),
+        Index(
+            "ix_recall_product_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "halfvec_cosine_ops"},
         ),
         Index(
             "ix_recall_product_brand_trgm",

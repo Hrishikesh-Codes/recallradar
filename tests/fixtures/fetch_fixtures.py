@@ -121,12 +121,12 @@ def main() -> None:
         save("openfda/food_event_99887.json", response.json(), str(response.url), "one event")
 
         # Paging: a small first page and its Link header (search_after).
-        params = {
+        page_params: dict[str, str | int] = {
             "search": "report_date:[20260901 TO 20261007]",
             "limit": 3,
             "sort": "report_date:asc",
         }
-        response = client.get(OPENFDA_URL.format(kind="food"), params=params)
+        response = client.get(OPENFDA_URL.format(kind="food"), params=page_params)
         response.raise_for_status()
         save("openfda/food_page_limit3.json", response.json(), str(response.url), "first page")
         save(

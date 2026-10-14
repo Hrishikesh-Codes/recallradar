@@ -6,7 +6,7 @@ values the next one needs. Secrets go only into each service's settings, never i
 | Piece | Service | Free plan limits that matter |
 |---|---|---|
 | Database | Neon | 1 GB per project, 100 CU-hours/month, scales to zero after 5 minutes |
-| API | **To decide** (see below) | Hugging Face Docker Spaces now need a paid PRO plan |
+| API | Oracle Cloud Always Free (Ampere A1 VM) | 4 ARM cores and 24 GB in total; always on. Sign-up verifies a card; Always Free resources aren't charged |
 | Web | Vercel (Hobby) | Non-commercial use |
 | Email | Resend | 3,000 emails/month, 100/day; needs a verified domain |
 | Schedule | GitHub Actions | Free for public repos |
@@ -34,29 +34,52 @@ values the next one needs. Secrets go only into each service's settings, never i
 4. Pick the sender addresses, e.g. `RecallRadar <alerts@your-domain>` and
    `RecallRadar <sign-in@your-domain>`.
 
-## 3. API
+## 3. API (Oracle Cloud Always Free VM)
 
-> **Host to be decided.** Hugging Face's Spaces docs now say "Gradio and Docker Spaces run on
-> compute and require a paid plan to create: PRO for personal accounts" (checked 2026-10-14);
-> only static Spaces stay free. The steps below are for a Space on a PRO account; the API image
-> runs anywhere that runs Docker (512 MB of RAM is enough: it idles at 191 MiB).
+The API runs in Docker behind Caddy, which gets and renews the HTTPS certificate. The VM deploys
+itself: every 10 minutes it checks `main` and deploys the newest commit whose CI run passed
+(`deploy/oracle/update.sh`), running migrations first. GitHub holds no SSH keys.
 
-1. Create a Space: SDK **Docker**, hardware **CPU basic**, public.
-2. In the Space's *Settings → Variables and secrets*, add:
+1. **Create the instance** (*Compute → Instances → Create*), in a region near your Neon database
+   (e.g. US East (Ashburn) with Neon's `us-east-1`):
+   - Image: **Canonical Ubuntu 24.04**. Shape: **VM.Standard.A1.Flex** (Always Free); 2 OCPUs and
+     12 GB is plenty (it idles at about 200 MB).
+   - Networking: a public subnet with a **public IPv4 address**.
+   - SSH keys: upload your public key.
+   - *Advanced options → Management → Initialization script*: paste
+     [`deploy/oracle/cloud-init.yaml`](../deploy/oracle/cloud-init.yaml). It installs Docker,
+     opens ports 80/443 in the instance firewall, checks out the repo, and starts the timer.
+2. **Open ports 80 and 443 in the VCN**: *Networking → Virtual cloud networks → (your VCN) →
+   Security → (default security list) → Add ingress rules*: source `0.0.0.0/0`, TCP, destination
+   ports `80,443` (and UDP 443 for HTTP/3, optional).
+3. **Pick the API's name.** Either add an `A` record for a subdomain you own (e.g.
+   `recallradar-api.example.com`) pointing at the VM's public IP, or use
+   `<IP with dashes>.sslip.io` (e.g. `203-0-113-7.sslip.io`), which needs no DNS.
+4. **Fill in the secrets** on the VM (`ssh ubuntu@<ip>`), replacing every `CHANGE_ME`:
 
-   | Name | Kind | Value |
-   |---|---|---|
-   | `DATABASE_URL` | secret | Neon **pooled** URL |
-   | `API_TOKEN_SECRET` | secret | `openssl rand -hex 32` (the web app gets the same value) |
-   | `CORS_ORIGINS` | variable | the web app's URL, e.g. `https://recallradar.vercel.app` |
-   | `ENVIRONMENT` | variable | `production` |
-   | `SENTRY_DSN` | secret | optional |
+   ```bash
+   sudo nano /opt/recallradar/.env
+   ```
 
-3. In GitHub (*Settings → Secrets and variables → Actions*): secret `HF_TOKEN` (a Hugging Face
-   token with write access to the Space) and variable `HF_SPACE` (`user/space-name`). Then run
-   **Deploy API to Hugging Face Spaces** from the Actions tab. Later pushes that touch the API
-   deploy automatically.
-4. Check `https://<user>-<space-name>.hf.space/readyz` returns `{"status":"ok","database":true}`.
+   | Name | Value |
+   |---|---|
+   | `API_DOMAIN` | the name from step 3 |
+   | `DATABASE_URL` | Neon **pooled** URL |
+   | `API_TOKEN_SECRET` | `openssl rand -hex 32` (the web app gets the same value) |
+   | `CORS_ORIGINS` | the web app's URL, e.g. `https://recallradar.vercel.app` |
+   | `SENTRY_DSN` | optional |
+
+5. **Deploy now** instead of waiting for the timer, and watch it:
+
+   ```bash
+   sudo systemctl start recallradar-update.service && journalctl -u recallradar-update -f
+   ```
+
+   The first build takes a few minutes (it downloads the embedding model into the image).
+6. Check `https://<API_DOMAIN>/readyz` returns `{"status":"ok","database":true}`.
+
+Useful later: `docker compose -f /opt/recallradar/src/deploy/oracle/compose.yaml logs -f api`;
+the deployed commit is in `/opt/recallradar/deployed`.
 
 ## 4. Web (Vercel)
 
@@ -65,7 +88,7 @@ values the next one needs. Secrets go only into each service's settings, never i
 
    | Name | Value |
    |---|---|
-   | `NEXT_PUBLIC_API_URL` | the Space URL, `https://<user>-<space-name>.hf.space` |
+   | `NEXT_PUBLIC_API_URL` | `https://<API_DOMAIN>` |
    | `DATABASE_URL` | Neon **pooled** URL |
    | `BETTER_AUTH_URL` | the site's URL |
    | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
@@ -73,7 +96,8 @@ values the next one needs. Secrets go only into each service's settings, never i
    | `SMTP_URL` | the Resend SMTP URL |
    | `MAIL_FROM` | the sign-in sender |
 
-3. Deploy, then set the Space's `CORS_ORIGINS` to the final URL if it changed.
+3. Deploy, then update `CORS_ORIGINS` in the VM's `.env` if the final URL differs, and restart:
+   `docker compose -f /opt/recallradar/src/deploy/oracle/compose.yaml up -d`.
 
 ## 5. Daily sync and alerts (GitHub Actions)
 
@@ -87,7 +111,6 @@ In the repo's Actions settings:
 | `SENTRY_DSN` | secret | optional |
 | `MAIL_FROM` | variable | the alerts sender |
 | `WEB_URL` | variable | the site's URL (for links in emails) |
-| `API_URL` | variable | the Space URL (the run also wakes it up) |
 
 Run **Sync recalls and send alerts** once by hand to check it; after that it runs daily at 09:17
 UTC. A failed source fails the run (and GitHub emails the repo owner), but the other sources'

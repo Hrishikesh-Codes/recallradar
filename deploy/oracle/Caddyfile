@@ -1,0 +1,12 @@
+# HTTPS for the API. Caddy obtains and renews the certificate for API_DOMAIN (set in
+# /opt/recallradar/.env). No access log: the privacy page promises we don't keep IP addresses.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:7860
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

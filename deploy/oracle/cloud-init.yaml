@@ -1,0 +1,49 @@
+#cloud-config
+# Paste into "Advanced options → Management → Initialization script" when creating an Always Free
+# Ampere A1 instance with Ubuntu 24.04 (see docs/DEPLOY.md). It installs Docker, opens ports 80
+# and 443 in the instance firewall, checks out the repo, and schedules update.sh. The API starts
+# once /opt/recallradar/.env is filled in.
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - jq
+  - iptables-persistent
+
+write_files:
+  - path: /etc/systemd/system/recallradar-update.service
+    content: |
+      [Unit]
+      Description=Deploy the latest RecallRadar API commit that passed CI
+      After=network-online.target docker.service
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/recallradar/src/deploy/oracle/update.sh
+  - path: /etc/systemd/system/recallradar-update.timer
+    content: |
+      [Unit]
+      Description=Check for a new RecallRadar API commit every 10 minutes
+
+      [Timer]
+      OnBootSec=2min
+      OnUnitActiveSec=10min
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  # Oracle's Ubuntu images reject every inbound port except SSH in iptables; allow HTTP(S)
+  # ahead of that rule. (The VCN security list must allow them too: see docs/DEPLOY.md.)
+  - iptables -I INPUT 5 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  - iptables -I INPUT 5 -m state --state NEW -p udp --dport 443 -j ACCEPT
+  - iptables -I INPUT 5 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  - netfilter-persistent save
+  - systemctl enable --now docker
+  - mkdir -p /opt/recallradar
+  - git clone https://github.com/Hrishikesh-Codes/recallradar.git /opt/recallradar/src
+  - install -m 600 /opt/recallradar/src/deploy/oracle/env.example /opt/recallradar/.env
+  - systemctl daemon-reload
+  - systemctl enable --now recallradar-update.timer

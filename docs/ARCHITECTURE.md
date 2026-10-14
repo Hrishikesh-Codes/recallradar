@@ -18,7 +18,7 @@ flowchart LR
     BFF["Server Actions + route handlers<br/>Better Auth (magic link, demo)"]
   end
 
-  subgraph HF["Hugging Face Space (Docker, CPU)"]
+  subgraph OCI["Oracle Cloud Always Free VM (Docker + Caddy)"]
     API["FastAPI<br/>/v1/check · /v1/me · /v1/stats"]
     MATCH["Matching engine<br/>bge-small embeddings + rules"]
   end
@@ -68,8 +68,8 @@ flowchart LR
 ### Why this shape
 
 - The landing page and design system are static (prerendered) and don't need the API, so they
-  stay fast even while the free Hugging Face Space is waking up. The recall counter is a cached
-  component that falls back to plain text when the API is asleep.
+  stay fast even if the API is down. The recall counter is a cached component that falls back to
+  plain text when the API can't be reached.
 - One database is the system of record: the API, the web server's auth, the jobs and the
   evaluation all read the same tables, and Alembic migrations in `packages/core` are the only way
   the schema changes (Better Auth's tables included).
@@ -141,7 +141,8 @@ Facts cache), `feedback` ("This is mine" / "Not my product" labels, not linked t
 | Path | What lives there |
 |---|---|
 | `apps/web` | Next.js app: pages, design system (`src/design`, `src/components`), Vitest + Playwright |
-| `apps/api` | FastAPI service and its Dockerfile (also the Hugging Face Space image) |
+| `apps/api` | FastAPI service and its Dockerfile |
+| `deploy/oracle` | Production compose file, Caddy config, cloud-init, and the self-deploy script |
 | `packages/core` | Settings, JSON logging, SQLAlchemy models, Alembic migrations |
 | `packages/ingest` | Source ingesters, normalisation, identifier extraction (M1) |
 | `packages/identify` | Input handling → `ProductQuery` (M1–M2) |

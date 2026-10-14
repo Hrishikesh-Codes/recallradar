@@ -1,0 +1,43 @@
+# The API on an Oracle Cloud Always Free VM: the API container behind Caddy, which gets and renews
+# the HTTPS certificate. Run from the repo checkout at /opt/recallradar/src (see update.sh).
+name: recallradar-prod
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: recallradar-api:deployed
+    env_file: ${RECALLRADAR_ENV_FILE:-/opt/recallradar/.env}
+    environment:
+      PORT: "7860"
+      # Only Caddy (on this compose network) may set the client address for rate limits.
+      FORWARDED_ALLOW_IPS: "172.16.0.0/12"
+    expose: ["7860"]
+    restart: unless-stopped
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7860/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.11.7
+    env_file: ${RECALLRADAR_ENV_FILE:-/opt/recallradar/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -1,6 +1,6 @@
 """In-process sliding-window rate limits.
 
-The API runs as a single instance on Hugging Face's free CPU, so per-process counters are exact
+The API runs as a single instance (one container on one VM), so per-process counters are exact
 and need no Redis. If it ever runs as several instances, each enforces its own limit.
 """
 
@@ -43,7 +43,8 @@ class RateLimiter:
 
 
 def client_key(request: Request) -> str:
-    # uvicorn runs with --proxy-headers behind Hugging Face's proxy, so this is the user's IP.
+    # Behind Caddy, uvicorn's --proxy-headers sets this from X-Forwarded-For, which it trusts only
+    # from FORWARDED_ALLOW_IPS (the compose network), so clients can't choose their own address.
     return request.client.host if request.client else "unknown"
 
 

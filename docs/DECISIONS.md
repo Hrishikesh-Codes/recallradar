@@ -130,11 +130,18 @@ why, and what it costs.
 
 ### Hosting
 
-- **Hugging Face Docker Spaces are no longer free for personal accounts.** Its docs now say
-  "Gradio and Docker Spaces run on compute and require a paid plan to create: PRO for personal
-  accounts" (checked 2026-10-14; forum reports date the change to mid-2026). The API's host is
-  therefore an open decision. The image is host-neutral (Docker, port from `$PORT`, model baked
-  in, 191 MiB idle), and `deploy-api.yml` only runs once a Space is configured.
+- **The API runs on an Oracle Cloud Always Free VM (decided 2026-10-14), not Hugging Face.**
+  Hugging Face's docs now say "Gradio and Docker Spaces run on compute and require a paid plan to
+  create: PRO for personal accounts" (forum reports date the change to mid-2026). Of the
+  alternatives, Render's free tier has 0.1 CPU and sleeps after 15 idle minutes (about a minute
+  to wake), and Cloud Run needs a billing account. Oracle's Always Free Ampere A1 shapes are
+  always on with ARM cores and gigabytes of RAM; its sign-up verifies a card. The image already
+  builds and runs on ARM64 (Apple Silicon builds are ARM64).
+- **The VM deploys itself by pulling.** A systemd timer checks `main` every 10 minutes and deploys
+  the newest commit whose CI run passed, running migrations first; GitHub holds no SSH key.
+  Caddy terminates HTTPS (automatic certificates) and keeps no access log. The API trusts
+  `X-Forwarded-For` only from the compose network (`FORWARDED_ALLOW_IPS`), so a client can't
+  spoof its address past the rate limit; tested locally on the production compose file.
 
 ### Web
 

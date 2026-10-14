@@ -53,9 +53,6 @@ jobs:
         run: uv run recallradar-embed
       - name: Re-check watched items and send alerts
         run: uv run recallradar-alerts
-      - name: Wake the API (Hugging Face Spaces sleep after two idle days)
-        if: vars.API_URL != ''
-        run: curl -fsS --max-time 120 "${{ vars.API_URL }}/healthz" || true
       - name: Fail the run if a source failed to sync
         if: steps.sync.outcome == 'failure'
         run: exit 1

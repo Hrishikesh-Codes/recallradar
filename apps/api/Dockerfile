@@ -1,5 +1,5 @@
 # API image. Built from the repo root:  docker build -f apps/api/Dockerfile .
-# Also the image Hugging Face Spaces runs, which requires uid 1000 and (by default) port 7860.
+# Runs as uid 1000 on port $PORT (7860 by default); deploy/oracle/compose.yaml runs it in production.
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /usr/local/bin/uv
@@ -27,6 +27,6 @@ RUN python -c "from pathlib import Path; from recallradar_matching.embed import 
 ENV HF_HUB_OFFLINE=1
 
 EXPOSE 7860
-# --proxy-headers: behind Hugging Face's proxy, the client address (for rate limits) comes from
-# X-Forwarded-For. The Space is only reachable through that proxy.
-CMD ["sh", "-c", "exec uvicorn recallradar_api.main:create_app --factory --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
+# Behind a reverse proxy the client address (for rate limits) comes from X-Forwarded-For, trusted
+# only from the addresses in $FORWARDED_ALLOW_IPS (uvicorn's default: 127.0.0.1 only).
+CMD ["sh", "-c", "exec uvicorn recallradar_api.main:create_app --factory --host 0.0.0.0 --port ${PORT} --proxy-headers"]

@@ -56,6 +56,7 @@ if a recall is announced later.
   device profiles, a Docker image smoke test, and a secret scan on every push.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system diagram and data model,
+[docs/DEPLOY.md](docs/DEPLOY.md) for deploying on free tiers,
 [docs/DESIGN.md](docs/DESIGN.md) for the design system, and
 [docs/DECISIONS.md](docs/DECISIONS.md) for why things are the way they are.
 
@@ -93,7 +94,8 @@ defaults. Never commit real secrets.
 
 ```
 apps/web            Next.js PWA
-apps/api            FastAPI service (+ Dockerfile, also used by Hugging Face Spaces)
+apps/api            FastAPI service (+ Dockerfile)
+deploy/oracle       production compose + Caddy + cloud-init for the API's VM
 packages/core       settings, logging, models, migrations
 packages/ingest     CPSC + openFDA ingesters, extraction
 packages/identify   inputs -> ProductQuery (text, link, barcode; photos and VIN in M2)

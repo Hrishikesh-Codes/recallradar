@@ -18,7 +18,10 @@ class Environment(StrEnum):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # An empty variable means "not set" (CI passes unset secrets as ""; .env.example has blanks).
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", env_ignore_empty=True
+    )
 
     environment: Environment = Environment.LOCAL
     database_url: str = LOCAL_DATABASE_URL

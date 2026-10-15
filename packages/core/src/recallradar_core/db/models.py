@@ -13,11 +13,12 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    SmallInteger,
     UniqueConstraint,
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from recallradar_core.db.base import Base, TimestampMixin, str_enum
@@ -124,6 +125,13 @@ class RecallProduct(TimestampMixin, Base):
     )
     where_to_look: Mapped[list[str]] = mapped_column(server_default=_EMPTY_TEXT_ARRAY)
     quantity: Mapped[str | None]
+    # Vehicles (NHTSA): normalised make and model ("HONDA", "CRV") and the recalled model years.
+    # Vehicles are matched on these, not by name similarity, and aren't embedded.
+    vehicle_make: Mapped[str | None]
+    vehicle_model: Mapped[str | None]
+    model_years: Mapped[list[int]] = mapped_column(
+        ARRAY(SmallInteger), server_default=text("'{}'::smallint[]")
+    )
     raw: Mapped[dict[str, Any] | None]
     content_hash: Mapped[str]
     search_text: Mapped[str] = mapped_column(
@@ -161,6 +169,7 @@ class RecallProduct(TimestampMixin, Base):
             postgresql_with={"m": 16, "ef_construction": 64},
             postgresql_ops={"embedding": "halfvec_cosine_ops"},
         ),
+        Index(None, "vehicle_make", "vehicle_model"),
         Index(
             "ix_recall_product_brand_trgm",
             "brand",

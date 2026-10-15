@@ -19,7 +19,8 @@
             "enum": [
               "text",
               "link",
-              "barcode"
+              "barcode",
+              "vin"
             ],
             "title": "Type",
             "type": "string"
@@ -321,7 +322,8 @@
             "enum": [
               "text",
               "link",
-              "barcode"
+              "barcode",
+              "vin"
             ],
             "title": "Input Type",
             "type": "string"
@@ -1209,7 +1211,7 @@
     },
     "/v1/check": {
       "post": {
-        "description": "Check one product (typed description, product link, or barcode) against every recall.\n\nNo account needed. Nothing about the product is stored, only that a check happened.",
+        "description": "Check one product (description, product link, barcode, or VIN) against every recall.\n\nNo account needed. Nothing about the product is stored, only that a check happened.",
         "operationId": "check_product_v1_check_post",
         "requestBody": {
           "content": {

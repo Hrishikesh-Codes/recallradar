@@ -13,6 +13,7 @@ const SECTIONS: ReadonlyArray<{ title: string; body: string[] }> = [
       "To stop abuse, the API counts requests per network address in memory for up to a day. Addresses are never written to our database.",
       "Product links: we read the words in the link itself. We never open store pages, and we never ask for store passwords.",
       "Barcodes: if a recall doesn't list the barcode, our server may look up the product name on Open Food Facts. Your address isn't sent to them, and we keep the result (the barcode and product name) so we don't ask twice.",
+      "VINs: our server asks NHTSA's free vPIC service which make, model, and year a VIN belongs to, keeps the answer in memory for a day, and never writes the VIN to our database (unless you save the vehicle to your list).",
     ],
   },
   {
@@ -33,7 +34,7 @@ const SECTIONS: ReadonlyArray<{ title: string; body: string[] }> = [
   {
     title: "Email",
     body: [
-      "If a CPSC recall newly matches something on your list, we email you once per item and recall. You can turn this off on your account page. FDA recalls aren't emailed (openFDA's terms rule it out); they show on your list.",
+      "If a CPSC or NHTSA recall newly matches something on your list, we email you once per item and recall. You can turn this off on your account page. FDA recalls aren't emailed (openFDA's terms rule it out); they show on your list.",
     ],
   },
   {

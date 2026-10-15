@@ -14,6 +14,7 @@ from recallradar_core.enums import RecallSource
 from recallradar_identify.barcode import parse_barcode
 from recallradar_identify.query import ProductQuery
 from recallradar_identify.text import parse_text
+from recallradar_identify.vin import Decoded, parse_vin
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import CheckResult, Tier, check, embed_query
 
@@ -23,6 +24,7 @@ INGESTED = [
     RecallSource.FDA_FOOD,
     RecallSource.FDA_DRUG,
     RecallSource.FDA_DEVICE,
+    RecallSource.NHTSA,
 ]
 
 
@@ -91,10 +93,46 @@ def test_unlisted_barcode_is_all_clear(run: Callable[..., CheckResult]) -> None:
     assert result.verdict is Tier.ALL_CLEAR
 
 
-def test_vehicle_is_not_covered(run: Callable[..., CheckResult]) -> None:
+def test_vehicle_matches_on_make_model_and_year(run: Callable[..., CheckResult]) -> None:
     result = run(parse_text("2019 Honda Civic"))
+    assert result.verdict is Tier.CHECK_UNIT  # recalls cover certain VINs
+    assert recall_ids(result) == ["20V314000"]
+    match = result.matches[0]
+    assert match.reasons[0] == "The 2019 HONDA CIVIC is listed in NHTSA recall 20V314000."
+    assert any("VIN" in tip for tip in match.what_to_check)
+
+
+def test_vehicle_without_a_recall_that_year_is_all_clear(run: Callable[..., CheckResult]) -> None:
+    result = run(parse_text("2024 Honda Civic"))  # the fixture recall covers 2018-2020
+    assert result.verdict is Tier.ALL_CLEAR
+
+
+def test_unknown_model_is_not_all_clear(run: Callable[..., CheckResult]) -> None:
+    assert run(parse_text("2019 Honda Flibbertigibbet")).verdict is Tier.UNIDENTIFIED
+
+
+def test_vin_query_uses_the_decoded_vehicle(run: Callable[..., CheckResult]) -> None:
+    query = parse_vin("1HGCM82633A004352", lambda vin: Decoded("HONDA", "Civic", 2019, None))
+    result = run(query)
+    assert recall_ids(result) == ["20V314000"]
+
+
+def test_do_not_drive_advisory_reaches_the_match(run: Callable[..., CheckResult]) -> None:
+    result = run(parse_text("2024 Porsche Cayenne"))
+    assert result.matches[0].recall.hazard is not None
+    assert result.matches[0].recall.hazard.startswith("NHTSA advises: do not drive")
+
+
+def test_child_seat_matches_by_brand_and_line(run: Callable[..., CheckResult]) -> None:
+    result = run(parse_text("Nuna Rava convertible car seat"))
+    assert result.verdict is Tier.CHECK_UNIT
+    assert recall_ids(result) == ["24C002000"]
+
+
+def test_meat_is_not_covered(run: Callable[..., CheckResult]) -> None:
+    result = run(parse_text("Oscar Mayer bacon"))
     assert result.verdict is Tier.NOT_COVERED
-    assert RecallSource.NHTSA in result.uncovered_sources
+    assert RecallSource.FSIS in result.uncovered_sources
 
 
 def test_vague_input_is_unidentified(run: Callable[..., CheckResult]) -> None:

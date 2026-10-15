@@ -1,7 +1,7 @@
 """Re-check watched items and email users about recalls that newly match them (SPEC §8).
 
 - One alert per item per recall per channel: the alert table's unique constraint enforces it.
-- Email only for CPSC recalls. openFDA's terms say its data must not be used to alert the
+- Email for CPSC and NHTSA recalls. openFDA's terms say its data must not be used to alert the
   public, so FDA matches show up in the app's list and are recorded here as "skipped".
 - No email for demo (anonymous) accounts, unverified addresses, or users who turned alerts off.
 - One email per user per run, listing everything new for them, in a calm tone.
@@ -26,13 +26,14 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from recallradar_core.db import Alert, AuthUser, Recall, UserSettings, WatchItem
 from recallradar_core.enums import SOURCE_LABELS, NoticeType, RecallSource
+from recallradar_identify.vin import Decoder
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import Match, Tier
 from recallradar_matching.watch import refresh
 
 logger = logging.getLogger("recallradar.jobs.alerts")
 
-EMAIL_SOURCES = frozenset({RecallSource.CPSC})
+EMAIL_SOURCES = frozenset({RecallSource.CPSC, RecallSource.NHTSA})
 DEFAULT_TIERS = ("recalled", "check_unit")
 TIER_WORDS = {Tier.RECALLED.value: "Recalled", Tier.CHECK_UNIT.value: "Check your unit"}
 
@@ -114,6 +115,7 @@ def recheck_all(
     embedder: Embedder,
     ingested: list[RecallSource],
     stats: RunStats,
+    decode_vin: Decoder | None = None,
 ) -> None:
     with sessions() as session:
         item_ids = list(session.scalars(select(WatchItem.id).order_by(WatchItem.id)))
@@ -122,7 +124,9 @@ def recheck_all(
             item = session.get(WatchItem, item_id)
             if item is None:  # deleted meanwhile
                 continue
-            result = refresh(session, item, embedder=embedder, ingested=ingested)
+            result = refresh(
+                session, item, embedder=embedder, ingested=ingested, decode_vin=decode_vin
+            )
             stats.items += 1
             stats.new_matches += len(result.new_matches)
             if result.new_matches:
@@ -171,7 +175,7 @@ def compose(to: str, rows: list[tuple[Alert, WatchItem, Recall]], web_url: str) 
     footer = (
         f"{explain}See your list: {list_url}\n"
         f"Turn alerts off or change them: {settings_url}\n\n"
-        "You get these because you saved items to RecallRadar. Email alerts cover CPSC "
+        "You get these because you saved items to RecallRadar. Email alerts cover CPSC and NHTSA "
         "recalls; FDA recalls appear on your list."
     )
     text_parts.append(footer)
@@ -187,7 +191,8 @@ def compose(to: str, rows: list[tuple[Alert, WatchItem, Recall]], web_url: str) 
         f"See your list</a> · <a href='{html.escape(settings_url, quote=True)}'>Change or "
         "turn off alerts</a></p>"
         "<p style='color:#555;font-size:13px'>You get these because you saved items to "
-        "RecallRadar. Email alerts cover CPSC recalls; FDA recalls appear on your list.</p>"
+        "RecallRadar. Email alerts cover CPSC and NHTSA recalls; FDA recalls appear on your "
+        "list.</p>"
     )
     return Outgoing(
         to=to,
@@ -308,11 +313,12 @@ def run(
     sender: Sender | None,
     mail_from: str,
     web_url: str,
+    decode_vin: Decoder | None = None,
 ) -> RunStats:
     stats = RunStats()
     started = time.perf_counter()
     stats.demo_accounts_deleted = delete_old_demo_accounts(sessions)
-    recheck_all(sessions, embedder, ingested, stats)
+    recheck_all(sessions, embedder, ingested, stats, decode_vin)
     if sender is not None:
         with sessions() as session:
             outgoing = pending_emails(session, web_url)

@@ -31,8 +31,8 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
         <p className="eyebrow mb-4 text-muted-2">My list</p>
         <h1 className="display text-display text-balance">Keep watch on what you own</h1>
         <p className="mt-4 max-w-prose text-muted-1">
-          Save products to a list. We re-check them every day and email you if a CPSC recall matches
-          one. FDA recalls show up on your list.
+          Save products to a list. We re-check them every day and email you if a CPSC or NHTSA
+          recall matches one. FDA recalls show up on your list.
         </p>
       </header>
       <div className="flex max-w-md flex-col gap-6">

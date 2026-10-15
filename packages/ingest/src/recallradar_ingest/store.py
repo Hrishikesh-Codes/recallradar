@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from recallradar_core.db import Recall, RecallProduct
 from recallradar_core.enums import RecallSource
+from recallradar_ingest.extract.text import code_key
 from recallradar_ingest.records import ProductRecord, RecallRecord
 
 # Neon's free plan stores 1 GB per project. Device recalls can list thousands of lot or serial
@@ -84,6 +85,9 @@ def _product_values(product: ProductRecord, recall_id: int) -> dict[str, Any]:
         "restrictions": [{"kind": r.kind.value, "detail": r.detail} for r in product.restrictions],
         "where_to_look": product.where_to_look,
         "quantity": product.quantity,
+        "vehicle_make": code_key(product.vehicle[0]) if product.vehicle else None,
+        "vehicle_model": code_key(product.vehicle[1]) if product.vehicle else None,
+        "model_years": product.model_years,
         "raw": product.raw,
         "content_hash": product.hash(),
     }

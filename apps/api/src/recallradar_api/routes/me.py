@@ -123,7 +123,7 @@ def list_items(user: CurrentUser, session: DbSession) -> list[schemas.ItemOut]:
 
 def _add_item(session: Session, state: State, user: AuthUser, body: schemas.NewItem) -> WatchItem:
     request = schemas.CheckRequest(input=body.input, purchase_date=body.purchase_date)
-    query = build_query(session, request, state.barcodes)
+    query = build_query(session, request, state.barcodes, state.vins)
     label = (body.label or query.product_name or query.brand or body.input.value)[:200]
     item = WatchItem(
         user_id=user.id,

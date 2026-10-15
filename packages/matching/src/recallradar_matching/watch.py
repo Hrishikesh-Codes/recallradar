@@ -10,7 +10,6 @@ items; M3 replaces it with a reverse lookup (new recall -> candidate items) and 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Literal
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -18,8 +17,9 @@ from sqlalchemy.orm import Session
 from recallradar_core.db import BarcodeLookup, WatchItem, WatchMatch
 from recallradar_core.enums import RecallSource
 from recallradar_identify.barcode import BarcodeInfo, Lookup
-from recallradar_identify.parse import parse_input
+from recallradar_identify.parse import InputKind, parse_input
 from recallradar_identify.query import ProductQuery
+from recallradar_identify.vin import Decoder
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import CheckResult, Match, Tier, check, embed_query
 
@@ -38,15 +38,14 @@ def cached_lookup(session: Session) -> Lookup:
     return lookup
 
 
-def item_query(session: Session, item: WatchItem) -> ProductQuery:
-    kind: Literal["text", "link", "barcode"] = (
-        "link"
-        if item.input_type == "link"
-        else "barcode"
-        if item.input_type == "barcode"
-        else "text"
-    )
-    query = parse_input(kind, item.input_value, cached_lookup(session))
+_KINDS: dict[str, InputKind] = {"link": "link", "barcode": "barcode", "vin": "vin"}
+
+
+def item_query(
+    session: Session, item: WatchItem, decode_vin: Decoder | None = None
+) -> ProductQuery:
+    kind = _KINDS.get(item.input_type, "text")
+    query = parse_input(kind, item.input_value, cached_lookup(session), decode_vin)
     if item.purchase_date is not None:
         query.purchase_date = item.purchase_date
     return query
@@ -74,9 +73,10 @@ def refresh(
     embedder: Embedder,
     ingested: Sequence[RecallSource],
     query: ProductQuery | None = None,
+    decode_vin: Decoder | None = None,
 ) -> Refresh:
     """Re-check `item`, store its current matches, and report the ones that are new."""
-    query = query or item_query(session, item)
+    query = query or item_query(session, item, decode_vin)
     result = check(session, query, embedding=embed_query(embedder, query), ingested=ingested)
     stored = {
         m.recall_id: m

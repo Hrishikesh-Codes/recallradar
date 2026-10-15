@@ -9,11 +9,6 @@ from recallradar_ingest.extract import codes, gtin
 from recallradar_ingest.extract.dates import find_dates
 from recallradar_ingest.extract.text import clean
 
-# A standalone token that looks like a model number: letters and digits mixed ("IP-DUO60",
-# "BGAAL9", "WL33006DMN"), at least four characters, and not a size ("20oz") or a year.
-_MODEL_TOKEN = re.compile(
-    r"(?<![\w-])(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[A-Za-z0-9][A-Za-z0-9\-./]{2,}[A-Za-z0-9](?![\w-])"
-)
 _YEAR = re.compile(r"\b(19[89]\d|20[0-3]\d)\b")
 _LOT = re.compile(
     r"\blot\s*(?:#|no\.?|number|code)?\s*[:#]?\s*([A-Za-z0-9][A-Za-z0-9\-./]{1,30})", re.I
@@ -22,11 +17,7 @@ _LOT = re.compile(
 
 def model_tokens(text: str) -> list[str]:
     """Unlabelled tokens that look like model numbers: "IP-DUO60", "PR70P"."""
-    found = []
-    for token in _MODEL_TOKEN.findall(text):
-        if codes.is_code_like(token, kind=codes.CodeKind.MODEL) and not _YEAR.fullmatch(token):
-            found.append(token)
-    return found
+    return codes.unlabelled_models(text)
 
 
 def _purchase_date(text: str) -> date | None:

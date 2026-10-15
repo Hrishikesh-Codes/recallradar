@@ -5,11 +5,12 @@ describe it, or enter a VIN, and get a clear, evidence-backed verdict from offic
 notices (CPSC, FDA, USDA FSIS, NHTSA). RecallRadar then keeps watching your list and alerts you
 if a recall is announced later.
 
-> **Status: Milestone 1 (thin slice), deployment pending.** Checks against 25,856 CPSC and FDA
-> recalls (every one since 2015) work end to end locally: type, paste a link, or scan a barcode,
-> and get a verdict with its evidence; save items to a list; get an email when a CPSC recall
-> matches one later. USDA FSIS and NHTSA (vehicles, car seats, meat) arrive in M2. Numbers below
-> are measured; how is in [docs/DECISIONS.md](docs/DECISIONS.md).
+> **Status: Milestone 1 built (deployment pending); Milestone 2 in progress.** Checks against
+> 41,165 recalls from CPSC and FDA (since 2015) and NHTSA (vehicles, car seats, tires, since 2010)
+> work end to end locally: type, paste a link, scan a barcode, or enter a VIN, and get a verdict
+> with its evidence; save items to a list; get an email when a CPSC or NHTSA recall matches one
+> later. USDA FSIS (meat, poultry, eggs) is next. Numbers below are measured; how is in
+> [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## How a check works
 
@@ -31,11 +32,11 @@ if a recall is announced later.
 
 | What | Result |
 |---|---|
-| Recalls indexed (since 2015) | 25,856 (CPSC 3,710 · FDA food 6,353 · drugs 3,824 · devices 11,969) |
-| Database size, everything embedded | 427 MB (Neon's free plan: 1 GB) |
+| Recalls indexed | 41,165: CPSC 3,710 · FDA food 6,353 · drugs 3,824 · devices 11,969 (since 2015) · NHTSA 15,309 (since 2010) |
+| Database size, everything embedded | 500 MB (Neon's free plan: 1 GB) |
 | Vector search vs exact search | recall@50 0.988 at 1.9 ms median (80 queries) |
-| Check latency (local, M-series Mac) | 35 ms median over the 53-case smoke set |
-| M1 smoke set | 53/53 after tuning on it: a regression check, **not** an accuracy estimate (M3) |
+| Check latency (local, M-series Mac) | 46 ms median over the 57-case smoke set |
+| Smoke set | 57/57 after tuning on it: a regression check, **not** an accuracy estimate (M3) |
 
 ## What's here
 

@@ -73,7 +73,7 @@ def embed_missing(
     batch_size: int = 512,
     limit: int | None = None,
 ) -> int:
-    """Embed recall products that have no embedding yet; returns how many were embedded."""
+    """Embed recall products (except vehicles) that have no embedding yet; returns the count."""
     done = 0
     while limit is None or done < limit:
         with sessions.begin() as session:
@@ -87,6 +87,8 @@ def embed_missing(
                 )
                 .join(Recall, Recall.id == RecallProduct.recall_id)
                 .where(RecallProduct.embedding.is_(None))
+                # Vehicles are matched on make, model and year, never by similarity.
+                .where(RecallProduct.vehicle_make.is_(None))
                 .order_by(RecallProduct.id)
                 .limit(batch_size if limit is None else min(batch_size, limit - done))
             ).all()

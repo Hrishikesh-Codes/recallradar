@@ -8,7 +8,7 @@ import httpx
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
 
-from recallradar_api.checking import BarcodeLookups, CoverageCache
+from recallradar_api.checking import BarcodeLookups, CoverageCache, VinDecoder
 from recallradar_api.ratelimit import RateLimiter
 from recallradar_identify.barcode import USER_AGENT
 from recallradar_matching.embed import Embedder
@@ -22,6 +22,7 @@ class AppState:
     coverage: CoverageCache
     check_limits: list[RateLimiter]
     feedback_limits: list[RateLimiter]
+    vins: VinDecoder | None = None
 
 
 def default_state(sessions: sessionmaker[Session], embedder: Embedder) -> AppState:
@@ -37,6 +38,7 @@ def default_state(sessions: sessionmaker[Session], embedder: Embedder) -> AppSta
             RateLimiter(limit=300, window_seconds=86_400),
         ],
         feedback_limits=[RateLimiter(limit=30, window_seconds=3600)],
+        vins=VinDecoder(client),
     )
 
 

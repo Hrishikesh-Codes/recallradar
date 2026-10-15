@@ -371,3 +371,20 @@ class _Scanner:
 def scan(text: str) -> CodeScan:
     """Model numbers, lots, serials, date codes, ranges, and labelled dates in `text`."""
     return _Scanner(_tokenize(text)).run()
+
+
+# A standalone token that looks like a model number: letters and digits mixed ("IP-DUO60",
+# "BGAAL9", "WL33006DMN", "IFS20FT"), at least four characters, and not a size or a year.
+_UNLABELLED_MODEL = re.compile(
+    r"(?<![\w-])(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[A-Za-z0-9][A-Za-z0-9\-./]{2,}[A-Za-z0-9](?![\w-])"
+)
+_YEAR_TOKEN = re.compile(r"(19[89]\d|20[0-3]\d)")
+
+
+def unlabelled_models(text: str) -> list[str]:
+    """Tokens that look like model numbers without a "Model" label: "IP-DUO60", "PR70P"."""
+    found = []
+    for token in _UNLABELLED_MODEL.findall(text):
+        if is_code_like(token, kind=CodeKind.MODEL) and not _YEAR_TOKEN.fullmatch(token):
+            found.append(token)
+    return list(dict.fromkeys(found))

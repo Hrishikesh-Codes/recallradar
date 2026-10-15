@@ -38,7 +38,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
               disabled={me.is_anonymous}
               className="size-5 accent-[var(--color-accent)]"
             />
-            Email me when a CPSC recall matches something on my list
+            Email me when a CPSC or NHTSA recall matches something on my list
           </label>
           <fieldset className="flex flex-col gap-2 pl-8" disabled={me.is_anonymous}>
             <legend className="mb-2 text-caption text-muted-2">For these verdicts</legend>

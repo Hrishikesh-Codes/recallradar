@@ -1,6 +1,6 @@
 """`recallradar-sync`: fetch recalls from the sources into the database.
 
-uv run recallradar-sync --mode backfill                 # every source since 2015
+uv run recallradar-sync --mode backfill                 # since 2015 (NHTSA: 2010)
 uv run recallradar-sync --source cpsc                   # incremental, one source
 uv run recallradar-sync --source fda_device --since 2020-01-01 --mode backfill
 """

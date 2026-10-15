@@ -1,11 +1,13 @@
+import json
 from datetime import date
+from pathlib import Path
 
 import httpx
 import pytest
 
 from recallradar_core.categories import Category
-from recallradar_identify import barcode, link, text
-from recallradar_identify.query import InputType
+from recallradar_identify import barcode, link, text, vin
+from recallradar_identify.query import InputType, Vehicle
 
 
 class TestText:
@@ -153,3 +155,37 @@ def test_link_slug_keeps_hyphenated_model_numbers() -> None:
     assert "CGG-6331" in query.model_numbers
     # Word pairs like "in-1" or "Size-10" aren't models.
     assert not any(m.startswith(("IN-", "SIZE-")) for m in query.model_numbers)
+
+
+class TestVin:
+    FIXTURES = Path(__file__).parents[3] / "tests" / "fixtures" / "nhtsa"
+
+    def decoder(self, name: str) -> vin.Decoder:
+        body = json.loads((self.FIXTURES / name).read_text())
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, json=body))
+        )
+        return lambda value: vin.decode_vpic(client, value)
+
+    def test_decodes_with_vpic(self) -> None:
+        # vPIC's documented sample VIN (a 2003 Honda Accord).
+        query = vin.parse_vin(
+            " 1hgcm82633a004352 ", self.decoder("vpic_decode_1HGCM82633A004352.json")
+        )
+        assert query.input_type is InputType.VIN
+        assert query.vehicle == Vehicle(make="HONDA", model="Accord", year=2003)
+        assert query.product_name == "2003 HONDA Accord"
+        assert Category.VEHICLE in query.categories
+        assert query.notes == ["We read this VIN as a 2003 HONDA Accord."]
+
+    def test_check_digit(self) -> None:
+        assert vin.check_digit_ok("1HGCM82633A004352")
+        assert not vin.check_digit_ok("1HGCM82633A004353")
+        query = vin.parse_vin("1HGCM82633A004353", self.decoder("vpic_decode_bad_check_digit.json"))
+        assert "check digit" in query.notes[0]
+
+    @pytest.mark.parametrize("raw", ["1HGCM82633A00435", "1HGCM82633A00435O", "not a vin"])
+    def test_rejects_malformed_vins(self, raw: str) -> None:
+        query = vin.parse_vin(raw, lambda value: pytest.fail("must not decode"))
+        assert query.vehicle is None
+        assert "17 letters and numbers" in query.notes[0]

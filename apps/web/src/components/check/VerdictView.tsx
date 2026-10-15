@@ -34,6 +34,7 @@ function ReadAs({ query }: { query: QueryOut }) {
     fields.push(["Barcode", query.upcs.map((u) => u.replace(/^0+/, "")).join(", ")]);
   if (query.lot_codes.length) fields.push(["Lot", query.lot_codes.join(", ")]);
   if (query.retailer) fields.push(["Store", query.retailer]);
+  if (query.input_type === "vin") fields.push(["VIN", "Decoded by NHTSA, not stored"]);
   if (!fields.length) return null;
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-muted-1">

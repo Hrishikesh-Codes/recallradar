@@ -1,0 +1,21 @@
+{
+ "Count": 1,
+ "Message": "Results returned successfully",
+ "results": [
+  {
+   "Manufacturer": "Nuna Baby Essentials, Inc.",
+   "NHTSACampaignNumber": "24C002000",
+   "NHTSAActionNumber": "PE24026",
+   "ReportReceivedDate": "27/11/2024",
+   "Component": "CHILD SEAT:HARNESS:FRONT ADJUSTER BUTTON/RELEASE MECHANISM",
+   "PotentialNumberofUnitsAffected": 608786,
+   "Summary": "Nuna Baby Essentials, Inc. (Nuna) is recalling certain Rava child seats with a plastic harness adjuster button, manufactured between July 16, 2016 and October 25, 2023.  Please see the recall report for a complete list of model numbers.  Debris may enter the front harness adjuster and cause the mechanism to fail, resulting in a loose harness.",
+   "Consequence": "In the event of a crash, the front harness may not restrain the child, increasing their risk of injury.",
+   "Remedy": "Nuna will provide owners a remedy kit, free of charge.  Owner notification letters were mailed February 14, 2025.  Owners may contact Nuna customer service at 1-855-686-2891 or via email at info.usa@nunababy.com.",
+   "Notes": "Owners may also contact the National Highway Traffic Safety Administration Vehicle Safety Hotline at 1-888-327-4236 (TTY 1-800-424-9153) or go to nhtsa.gov.",
+   "ModelYear": "9999",
+   "Make": "NUNA",
+   "Model": "RAVA"
+  }
+ ]
+}

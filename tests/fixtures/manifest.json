@@ -58,5 +58,35 @@
   "url": "https://api.fda.gov/food/enforcement.json?search=recall_number%3A%22NOPE-0000-0000%22",
   "fetched_at": "2026-10-13T23:27:24.682380+00:00",
   "note": "HTTP 404 body"
+ },
+ {
+  "file": "nhtsa/flat_rcl_sample.txt",
+  "url": "https://static.nhtsa.gov/odi/ffdd/rcl/FLAT_RCL_POST_2010.zip",
+  "fetched_at": "2026-10-15T22:46:16.121102+00:00",
+  "note": "every row of campaigns 16C002000, 20V314000, 24C002000, 24E056000, 24V533000, 25T013000 (tab-separated, UTF-8)"
+ },
+ {
+  "file": "nhtsa/RCL.txt",
+  "url": "https://static.nhtsa.gov/odi/ffdd/rcl/RCL.txt",
+  "fetched_at": "2026-10-15T22:46:16.121102+00:00",
+  "note": "field layout of the flat file"
+ },
+ {
+  "file": "nhtsa/vpic_decode_1HGCM82633A004352.json",
+  "url": "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1HGCM82633A004352?format=json",
+  "fetched_at": "2026-10-15T22:46:16.121102+00:00",
+  "note": "vPIC's documented sample VIN"
+ },
+ {
+  "file": "nhtsa/vpic_decode_bad_check_digit.json",
+  "url": "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1HGCM82633A004353?format=json",
+  "fetched_at": "2026-10-15T22:46:16.121102+00:00",
+  "note": "same VIN with a wrong check digit"
+ },
+ {
+  "file": "nhtsa/campaign_24C002000.json",
+  "url": "https://api.nhtsa.gov/recalls/campaignNumber?campaignNumber=24C002000",
+  "fetched_at": "2026-10-15T22:46:16.121102+00:00",
+  "note": "recalls API, for comparison with the flat file"
  }
 ]

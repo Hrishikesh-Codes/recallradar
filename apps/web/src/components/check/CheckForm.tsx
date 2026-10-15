@@ -14,6 +14,7 @@ const MODES: ReadonlyArray<{ mode: Mode; label: string }> = [
   { mode: "text", label: "Describe it" },
   { mode: "link", label: "Paste a link" },
   { mode: "barcode", label: "Scan barcode" },
+  { mode: "vin", label: "Vehicle VIN" },
 ];
 
 /** Real products from the evaluation set, one per verdict, so the demo shows every outcome. */
@@ -39,7 +40,12 @@ export function CheckForm({
   submitLabel?: string;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
-  const [values, setValues] = useState<Record<Mode, string>>({ text: "", link: "", barcode: "" });
+  const [values, setValues] = useState<Record<Mode, string>>({
+    text: "",
+    link: "",
+    barcode: "",
+    vin: "",
+  });
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   const baseId = useId();
 
@@ -137,6 +143,19 @@ export function CheckForm({
               onChange={(event) => set(event.target.value)}
               maxLength={17}
               autoComplete="off"
+            />
+          ) : null}
+          {mode === "vin" ? (
+            <TextField
+              label="Vehicle identification number (VIN)"
+              hint="17 characters, on the lower left of the windshield or on your registration. NHTSA decodes it; we don't keep it."
+              placeholder="e.g. 1HGCM82633A004352"
+              value={values.vin}
+              onChange={(event) => set(event.target.value.toUpperCase())}
+              maxLength={20}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
             />
           ) : null}
           <Button

@@ -1,6 +1,9 @@
 """Parser and fetcher tests against real API responses saved in tests/fixtures."""
 
+import io
 import json
+import re
+import zipfile
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -11,7 +14,7 @@ import pytest
 from recallradar_core.categories import Category
 from recallradar_core.enums import NoticeType, RecallSource, RecallStatus, RemedyType
 from recallradar_ingest.extract.restrictions import RestrictionKind
-from recallradar_ingest.sources import cpsc, openfda
+from recallradar_ingest.sources import cpsc, nhtsa, openfda
 
 FIXTURES = Path(__file__).parents[3] / "tests" / "fixtures"
 
@@ -266,3 +269,77 @@ class TestOpenFdaFetch:
             )
             == []
         )
+
+
+class TestNhtsa:
+    @staticmethod
+    def campaigns() -> dict[str, nhtsa.Campaign]:
+        lines = (FIXTURES / "nhtsa" / "flat_rcl_sample.txt").read_text(encoding="utf-8")
+        return nhtsa.read(iter(lines.splitlines()), start=date(2010, 1, 1), end=date(2030, 1, 1))
+
+    def test_layout_matches_the_documented_fields(self) -> None:
+        layout = (FIXTURES / "nhtsa" / "RCL.txt").read_text()
+        documented = re.findall(r"^\d+\s+([A-Z_]+)\s", layout, re.M)
+        assert tuple(documented) == nhtsa.FIELDS
+
+    def test_rows_group_into_campaigns_and_windows_filter_them(self) -> None:
+        campaigns = self.campaigns()
+        assert set(campaigns) == {
+            "20V314000", "24C002000", "25T013000", "24E056000", "24V533000", "16C002000",
+        }  # fmt: skip
+        recent = nhtsa.read(
+            iter((FIXTURES / "nhtsa" / "flat_rcl_sample.txt").read_text().splitlines()),
+            start=date(2025, 1, 1),
+            end=date(2025, 12, 31),
+        )
+        assert set(recent) == {"25T013000"}
+
+    def test_vehicle_recall_lists_makes_models_and_years(self) -> None:
+        recall = nhtsa.parse(self.campaigns()["20V314000"])
+        assert recall.source is RecallSource.NHTSA
+        assert recall.official_url == "https://www.nhtsa.gov/recalls?nhtsaId=20V314000"
+        assert recall.classification == "Vehicle"
+        assert recall.title.startswith("Honda (American Honda Motor Co")
+        civic = next(p for p in recall.products if p.vehicle == ("HONDA", "CIVIC"))
+        assert 2019 in civic.model_years
+        assert civic.unit_restricted
+        assert "VIN" in civic.restrictions[0].detail
+        assert Category.VEHICLE in civic.categories
+
+    def test_do_not_drive_advisory_leads_the_hazard(self) -> None:
+        recall = nhtsa.parse(self.campaigns()["24V533000"])
+        assert recall.hazard is not None
+        assert recall.hazard.startswith("NHTSA advises: do not drive")
+        assert recall.raw["do_not_drive"] is True
+
+    def test_child_seat_recall_is_infant_and_restricted_by_manufacture_date(self) -> None:
+        recall = nhtsa.parse(self.campaigns()["24C002000"])
+        (seat,) = recall.products
+        assert seat.product_name == "NUNA RAVA child seat"
+        assert seat.brand == "NUNA" and seat.vehicle is None and seat.model_years == []
+        assert Category.INFANT_CHILD in seat.categories
+        assert any(r.kind is RestrictionKind.DATE for r in seat.restrictions)
+        assert recall.title == (
+            "Nuna Baby Essentials, Inc. recalls NUNA RAVA child seats "
+            "(front adjuster button/release mechanism)"
+        )
+
+    def test_tire_and_equipment_part_numbers_become_model_numbers(self) -> None:
+        equipment = nhtsa.parse(self.campaigns()["24E056000"])
+        models = {m for p in equipment.products for m in p.model_numbers}
+        assert {"710244-01", "IFS20FT"} <= models
+        tire = nhtsa.parse(self.campaigns()["25T013000"])
+        assert tire.products[0].product_name.endswith("tires")
+
+    def test_fetch_reads_the_zip(self) -> None:
+        content = (FIXTURES / "nhtsa" / "flat_rcl_sample.txt").read_bytes()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("FLAT_RCL_POST_2010.txt", content)
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, content=buffer.getvalue()))
+        )
+        batches = list(nhtsa.fetch(client, start=date(2024, 1, 1), end=date(2024, 12, 31)))
+        assert {c.fields["CAMPNO"] for batch in batches for c in batch} == {
+            "24C002000", "24E056000", "24V533000",
+        }  # fmt: skip

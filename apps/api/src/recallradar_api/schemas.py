@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from recallradar_core.enums import NoticeType, RecallSource, RecallStatus, RemedyType
 from recallradar_matching.engine import Tier
 
-InputKind = Literal["text", "link", "barcode"]
+InputKind = Literal["text", "link", "barcode", "vin"]
 
 
 class CheckInput(BaseModel):

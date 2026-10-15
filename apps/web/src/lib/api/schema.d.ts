@@ -52,7 +52,7 @@ export interface paths {
     put?: never;
     /**
      * Check Product
-     * @description Check one product (typed description, product link, or barcode) against every recall.
+     * @description Check one product (description, product link, barcode, or VIN) against every recall.
      *
      *     No account needed. Nothing about the product is stored, only that a check happened.
      */
@@ -306,7 +306,7 @@ export interface components {
        * Type
        * @enum {string}
        */
-      type: "text" | "link" | "barcode";
+      type: "text" | "link" | "barcode" | "vin";
       /** Value */
       value: string;
     };
@@ -428,7 +428,7 @@ export interface components {
        * Input Type
        * @enum {string}
        */
-      input_type: "text" | "link" | "barcode";
+      input_type: "text" | "link" | "barcode" | "vin";
       /** Input Value */
       input_value: string;
       /** Label */

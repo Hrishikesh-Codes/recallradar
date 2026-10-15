@@ -14,19 +14,24 @@ from recallradar_core.db import SyncRun
 from recallradar_core.enums import RecallSource, SyncMode, SyncStatus
 from recallradar_ingest import store
 from recallradar_ingest.records import RecallRecord
-from recallradar_ingest.sources import cpsc, openfda
+from recallradar_ingest.sources import cpsc, nhtsa, openfda
 
 logger = logging.getLogger("recallradar.ingest.sync")
 
 # SPEC §4.2: backfill at least 10 years where available.
 DEFAULT_BACKFILL_START = date(2015, 1, 1)
-# Re-read a little history every time: CPSC edits notices; openFDA corrects past reports weekly.
+# Cars stay on the road for decades, so NHTSA goes back as far as its flat file does.
+BACKFILL_START = {RecallSource.NHTSA: date(2010, 1, 1)}
+# Re-read a little history every time: CPSC edits notices; openFDA corrects past reports weekly;
+# NHTSA adds models to campaigns as manufacturers amend their reports.
 INCREMENTAL_OVERLAP = {
     RecallSource.CPSC: timedelta(days=3),
     RecallSource.FDA_FOOD: timedelta(days=35),
     RecallSource.FDA_DRUG: timedelta(days=35),
     RecallSource.FDA_DEVICE: timedelta(days=35),
+    RecallSource.NHTSA: timedelta(days=60),
 }
+FDA_SOURCES = frozenset({RecallSource.FDA_FOOD, RecallSource.FDA_DRUG, RecallSource.FDA_DEVICE})
 SUPPORTED = tuple(INCREMENTAL_OVERLAP)
 BATCH = 200
 
@@ -67,15 +72,16 @@ class SyncResult:
 def _window(session: Session, source: RecallSource, mode: SyncMode, since: date | None) -> date:
     if since is not None:
         return since
+    backfill_start = BACKFILL_START.get(source, DEFAULT_BACKFILL_START)
     if mode is SyncMode.BACKFILL:
-        return DEFAULT_BACKFILL_START
+        return backfill_start
     last = session.scalar(
         select(SyncRun.started_at)
         .where(SyncRun.source == source, SyncRun.status == SyncStatus.SUCCEEDED)
         .order_by(SyncRun.started_at.desc())
         .limit(1)
     )
-    return (last.date() - INCREMENTAL_OVERLAP[source]) if last else DEFAULT_BACKFILL_START
+    return (last.date() - INCREMENTAL_OVERLAP[source]) if last else backfill_start
 
 
 def _pages(
@@ -92,6 +98,9 @@ def _pages(
             client, start=start, end=end, by_last_publish=mode is SyncMode.INCREMENTAL
         ):
             yield [cpsc.parse(record) for record in raw]
+    elif source is RecallSource.NHTSA:
+        for campaigns in nhtsa.fetch(client, start=start, end=end):
+            yield [nhtsa.parse(campaign) for campaign in campaigns]
     else:
         for raw in openfda.fetch(client, source, start=start, end=end, api_key=openfda_api_key):
             yield openfda.parse_events(source, raw)
@@ -130,7 +139,7 @@ def run(
                 batch = records[offset : offset + BATCH]
                 with session_factory() as session, session.begin():
                     result.upserts.add(store.upsert(session, batch))
-                    if source is not RecallSource.CPSC:
+                    if source in FDA_SOURCES:
                         store.refresh_fda_rollups(
                             session, source, [r.source_recall_id for r in batch]
                         )

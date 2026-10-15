@@ -120,7 +120,7 @@ class WatchItem(TimestampMixin, Base):
     last_checked_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (
-        CheckConstraint("input_type IN ('text', 'link', 'barcode')", name="input_type"),
+        CheckConstraint("input_type IN ('text', 'link', 'barcode', 'vin')", name="input_type"),
         Index(None, "user_id", "created_at"),
     )
 

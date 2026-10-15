@@ -4,6 +4,7 @@ import logging
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -19,6 +20,7 @@ from recallradar_core.enums import SOURCE_LABELS, RecallSource, RemedyType, Sync
 from recallradar_identify.barcode import BarcodeInfo, lookup_open_food_facts
 from recallradar_identify.parse import parse_input
 from recallradar_identify.query import ProductQuery
+from recallradar_identify.vin import Decoded, decode_vpic
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import CheckResult, Match, check, embed_query
 
@@ -84,11 +86,41 @@ def _info(row: BarcodeLookup) -> BarcodeInfo:
     )
 
 
+class VinDecoder:
+    """vPIC VIN decoding, remembered in memory for a day. VINs are never written to the
+    database: a VIN-based check stores nothing about the vehicle."""
+
+    def __init__(self, client: httpx.Client, max_entries: int = 2048) -> None:
+        self.client = client
+        self.max_entries = max_entries
+        self._cache: OrderedDict[str, tuple[float, Decoded | None]] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def __call__(self, vin: str) -> Decoded | None:
+        with self._lock:
+            hit = self._cache.get(vin)
+            if hit and time.monotonic() - hit[0] < 86_400:
+                return hit[1]
+        try:
+            decoded = decode_vpic(self.client, vin)
+        except (httpx.HTTPError, ValueError):
+            logger.warning("VIN decode failed", exc_info=True)
+            return None
+        with self._lock:
+            self._cache[vin] = (time.monotonic(), decoded)
+            while len(self._cache) > self.max_entries:
+                self._cache.popitem(last=False)
+        return decoded
+
+
 def build_query(
-    session: Session, request: schemas.CheckRequest, barcodes: BarcodeLookups | None
+    session: Session,
+    request: schemas.CheckRequest,
+    barcodes: BarcodeLookups | None,
+    vins: VinDecoder | None = None,
 ) -> ProductQuery:
     lookup = (lambda gtin14: barcodes.lookup(session, gtin14)) if barcodes else None
-    query = parse_input(request.input.type, request.input.value, lookup)
+    query = parse_input(request.input.type, request.input.value, lookup, vins)
     if request.purchase_date is not None:
         query.purchase_date = request.purchase_date
     return query
@@ -226,9 +258,10 @@ def run_check(
     embedder: Embedder,
     barcodes: BarcodeLookups | None,
     coverage: CoverageCache,
+    vins: VinDecoder | None = None,
 ) -> schemas.CheckResponse:
     started = time.perf_counter()
-    query = build_query(session, request, barcodes)
+    query = build_query(session, request, barcodes, vins)
     sources = coverage.get(session)
     result: CheckResult = check(
         session,

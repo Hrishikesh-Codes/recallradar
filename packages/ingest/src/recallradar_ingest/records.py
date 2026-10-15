@@ -36,6 +36,9 @@ class ProductRecord:
     restrictions: list[Restriction] = field(default_factory=list)
     where_to_look: list[str] = field(default_factory=list)
     quantity: str | None = None
+    # Vehicles only (NHTSA): make and model as printed, and the recalled model years.
+    vehicle: tuple[str, str] | None = None
+    model_years: list[int] = field(default_factory=list)
     raw: dict[str, Any] | None = None
 
     @property

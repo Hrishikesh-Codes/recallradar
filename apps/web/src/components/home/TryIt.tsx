@@ -19,7 +19,9 @@ export function TryIt() {
       ? "link"
       : /^\d[\d ]{6,16}$/.test(text)
         ? "barcode"
-        : "text";
+        : /^(?=.*\d)(?=.*[A-HJ-NPR-Z])[A-HJ-NPR-Z0-9]{17}$/i.test(text.replace(/\s/g, ""))
+          ? "vin"
+          : "text";
     savePendingCheck({ type, value: text });
     router.push("/check");
   }
@@ -27,12 +29,12 @@ export function TryIt() {
   return (
     <form onSubmit={submit} className="flex w-full max-w-xl flex-col gap-3 sm:flex-row">
       <label htmlFor="try-it" className="sr-only">
-        Product, link, or barcode digits
+        Product, link, barcode digits, or VIN
       </label>
       <input
         id="try-it"
         className="field flex-1"
-        placeholder="Try it: a product, a link, or barcode digits"
+        placeholder="Try it: a product, a link, a barcode, or a VIN"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         maxLength={2000}

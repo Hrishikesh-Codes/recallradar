@@ -60,6 +60,10 @@ def _request(client: httpx.Client, url: str, params: dict[str, Any] | None) -> h
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+def get_bytes(client: httpx.Client, url: str, params: dict[str, Any] | None = None) -> bytes:
+    return _request(client, url, params).content
+
+
 def get_json(client: httpx.Client, url: str, params: dict[str, Any] | None = None) -> Any:
     return _request(client, url, params).json()
 

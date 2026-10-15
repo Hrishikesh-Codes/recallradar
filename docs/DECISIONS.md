@@ -3,6 +3,40 @@
 A short log of design decisions and why. Newest milestone first; each entry says what was decided,
 why, and what it costs.
 
+## M2 — Full coverage (in progress, from 2026-10-15)
+
+### NHTSA: vehicles, car seats, tires, equipment
+
+- **Source: NHTSA's recall flat file**, `FLAT_RCL_POST_2010.zip` (15 MB zipped, 311 MB of text,
+  refreshed daily), laid out in `RCL.txt`. One tab-separated UTF-8 row per make, model, model
+  year and component; a recall is its campaign number. No keys or paging: backfills and daily
+  syncs download the file and keep campaigns received in the window (17 s, 290 MB peak).
+- **Backfill from 2010, not 2015.** Cars stay on the road for decades and the file starts in
+  2010: 15,309 campaigns, which become 40,193 products (37,192 vehicles grouped by make and model
+  with their model years, 3,001 car seats, tires and equipment). The database grows by 73 MB to
+  500 MB after compaction.
+- **Vehicles are matched on make, model and year, never by similarity**, and aren't embedded.
+  A query is a vehicle when it comes from a VIN, or names a recalled make plus one of its recalled
+  models or a model year ("Honda generator" is not a vehicle). Variants count ("2019 Silverado"
+  finds "SILVERADO 1500" and "2500HD", labelled as variants), exact names first.
+- **A vehicle match is at most "Check your unit".** Recalls cover certain VINs, and NHTSA's public
+  API can't say whether a VIN is included, so every vehicle match points to NHTSA's VIN search
+  (`https://www.nhtsa.gov/recalls?nhtsaId=<campaign>`, checked in a browser: NHTSA's site
+  refuses scripted requests). A model NHTSA has recalled in other years gives *All clear* for a
+  year without recalls; a model it has never recalled gives *Couldn't identify*, since a name
+  mismatch is likelier than a perfect record. Model years up to 2010 without matches get *Can't
+  check yet*, and older-vehicle matches carry a note: recalls filed before 2010 aren't loaded.
+- **"Do not drive" and "park outside" advisories lead the hazard text.**
+- **Brand evidence ignores vehicle rows.** Counting them made "Honda" appear in thousands of
+  products, so it stopped counting as a brand and the Honda EU2200i generator recall (CPSC 8513)
+  went unmatched: a dangerous miss caught while labelling, now a smoke-set case. Smoke set:
+  57/57 (still a tuning set, not an accuracy estimate).
+- **VINs are decoded by NHTSA's vPIC** (free, no key), validated with the check digit first (a
+  failed check is a warning: only North American VINs must have one), kept in memory for a day,
+  and never written to the database unless the user saves the vehicle to their list.
+- **NHTSA recalls are emailed too.** The CPSC-only rule came from openFDA's terms; NHTSA's data has
+  no such restriction.
+
 ## M1 — Thin slice (2026-10-13 to 10-14)
 
 ### Recall data

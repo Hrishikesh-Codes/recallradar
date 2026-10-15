@@ -10,6 +10,7 @@ import json
 import os
 import uuid
 from collections.abc import Callable, Iterator
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,7 @@ from recallradar_core.db.migrate import upgrade_to_head
 from recallradar_core.enums import RecallSource
 from recallradar_core.settings import LOCAL_DATABASE_URL, Settings
 from recallradar_ingest import store
-from recallradar_ingest.sources import cpsc, openfda
+from recallradar_ingest.sources import cpsc, nhtsa, openfda
 from recallradar_matching.embed import Embedder, embed_missing
 
 
@@ -84,6 +85,9 @@ def load_fixture_recalls(url: str, embedder: Embedder) -> None:
         (RecallSource.FDA_DEVICE, "openfda/device_by_recall_number.json"),
     ]:
         records += openfda.parse_events(source, load_fixture(name)["results"])
+    rows = (FIXTURES / "nhtsa" / "flat_rcl_sample.txt").read_text(encoding="utf-8").splitlines()
+    campaigns = nhtsa.read(iter(rows), start=date(2010, 1, 1), end=date(2030, 1, 1))
+    records += [nhtsa.parse(campaign) for campaign in campaigns.values()]
     with sessions.begin() as session:
         store.upsert(session, records)
     embed_missing(sessions, embedder, batch_size=64)

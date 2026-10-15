@@ -29,6 +29,7 @@ from recallradar_core.enums import SOURCE_LABELS, NoticeType, RecallSource
 from recallradar_identify.query import ProductQuery
 from recallradar_identify.text import model_tokens
 from recallradar_ingest.extract.text import code_key
+from recallradar_matching import vehicles
 from recallradar_matching.embed import Embedder
 from recallradar_matching.text import (
     GENERIC,
@@ -287,9 +288,15 @@ def _score(match: Match, query: ProductQuery, safety_critical: bool) -> None:
         )
 
 
+def _is_code(token: str) -> bool:
+    """A model code ("pl01", "a1263", "ipduo60"), not a name with a digit ("4ever", "rav4")."""
+    digits = sum(c.isdigit() for c in token)
+    return digits >= 2 or sum(c.isalpha() for c in token) < 3
+
+
 def _line_words(query: ProductQuery, brand_words: set[str]) -> set[str]:
-    """Distinctive query words beyond the brand and model numbers, plural-folded."""
-    model_words = {t for m in query.model_numbers for t in tokens(m)}
+    """Distinctive query words beyond the brand and model codes, plural-folded."""
+    model_words = {t for m in query.model_numbers for t in tokens(m) if _is_code(t)}
     return stems(distinctive_tokens(query.search_text()) - brand_words - model_words)
 
 
@@ -332,6 +339,9 @@ class _TokenFrequency:
             hits = (
                 select(literal(1))
                 .where(RecallProduct.search_text.op("@@")(q))
+                # Vehicle rows repeat their make thousands of times ("Honda" in every Civic
+                # recall); counting them would stop "Honda" being a brand for its generators.
+                .where(RecallProduct.vehicle_make.is_(None))
                 .limit(FREQUENCY_CAP)
                 .subquery()
             )
@@ -384,8 +394,13 @@ def check(
     has_input = bool(
         query.upcs or query.model_numbers or (query.search_text() and tokens(query.search_text()))
     )
-    if not has_input:
+    if not has_input and query.vehicle is None:
         return CheckResult(Tier.UNIDENTIFIED, [], [], list(ingested), [], notes)
+
+    if RecallSource.NHTSA in ingested and (vq := vehicles.vehicle_query(session, query)):
+        vehicle = vehicles.find(session, vq)
+        if vehicle is not None:
+            return _vehicle_result(vehicle, ingested, notes)
 
     signals = _retrieve(session, query, embedding)
     rows = session.execute(
@@ -475,6 +490,88 @@ def check(
     else:
         verdict = Tier.ALL_CLEAR
     return CheckResult(verdict, matches, related, list(ingested), uncovered, notes)
+
+
+MAX_VEHICLE_MATCHES = 25  # a popular model can have many recalls; show them all
+
+
+def _one_per_recall_rows(
+    rows: list[tuple[RecallProduct, Recall]],
+) -> list[tuple[RecallProduct, Recall]]:
+    seen: set[int] = set()
+    unique = []
+    for product, recall in rows:
+        if recall.id not in seen:
+            seen.add(recall.id)
+            unique.append((product, recall))
+    return unique
+
+
+def _years_label(years: list[int]) -> str:
+    if not years:
+        return ""
+    return str(years[0]) if years[0] == years[-1] else f"{years[0]}\u2013{years[-1]}"
+
+
+def _vehicle_result(
+    vehicle: vehicles.VehicleResult, ingested: Sequence[RecallSource], notes: list[str]
+) -> CheckResult:
+    vq = vehicle.query
+    matches = []
+    rows = _one_per_recall_rows(vehicle.rows)
+    for product, recall in rows[:MAX_VEHICLE_MATCHES]:
+        name = product.product_name.split(", ")[0]  # "HONDA CIVIC, 2018-2020" -> "HONDA CIVIC"
+        years = _years_label(product.model_years)
+        listed = f"The {vq.year} {name}" if vq.year else f"The {name} ({years})"
+        reasons = [f"{listed} is listed in {_source_label(recall)}."]
+        if product.id not in vehicle.exact_ids:
+            reasons.append(f"That's the {name}: check whether yours is this version.")
+        if vq.year is None and years:
+            reasons.append("Add your model year to narrow this down.")
+        matches.append(
+            Match(
+                product=product,
+                recall=recall,
+                tier=Tier.CHECK_UNIT,
+                signals=Signals(),
+                brand_match=True,
+                reasons=reasons,
+                what_to_check=[
+                    *(r.get("detail", "") for r in product.restrictions if r.get("detail")),
+                    *product.where_to_look,
+                ],
+            )
+        )
+    if len(rows) > MAX_VEHICLE_MATCHES:
+        notes.append(
+            f"Showing {MAX_VEHICLE_MATCHES} of {len(rows)} recalls. NHTSA's VIN search lists the "
+            "open ones for your exact vehicle."
+        )
+    older = vq.year is not None and vq.year <= vehicles.FIRST_COVERED_YEAR
+    if older:
+        notes.append(
+            f"We have NHTSA recalls filed since {vehicles.FIRST_COVERED_YEAR}, so older recalls "
+            "for this vehicle may be missing. NHTSA's VIN search covers them all."
+        )
+    if matches:
+        verdict = Tier.CHECK_UNIT
+    elif older:
+        verdict = Tier.NOT_COVERED
+    elif vehicle.model_known and vq.year is not None:
+        verdict = Tier.ALL_CLEAR
+        notes.append(
+            "NHTSA has recalls for other model years of this vehicle, none for yours since 2010."
+        )
+    elif vehicle.model_known:
+        verdict = Tier.UNIDENTIFIED
+        notes.append("Add the model year so we can check the right recalls.")
+    else:
+        verdict = Tier.UNIDENTIFIED
+        notes.append(
+            "We couldn't find that model among NHTSA's recalls for this make. Check the model "
+            "name, or enter the VIN."
+        )
+    return CheckResult(verdict, matches, [], list(ingested), [], notes)
 
 
 def embed_query(embedder: Embedder, query: ProductQuery) -> list[float] | None:

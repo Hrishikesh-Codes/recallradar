@@ -8,7 +8,7 @@ describe("pending check handoff", () => {
   });
 
   it("ignores anything that isn't a check", () => {
-    window.sessionStorage.setItem("recallradar:pending-check", '{"type":"vin","value":"x"}');
+    window.sessionStorage.setItem("recallradar:pending-check", '{"type":"photo","value":"x"}');
     expect(takePendingCheck()).toBeNull();
     window.sessionStorage.setItem("recallradar:pending-check", "not json");
     expect(takePendingCheck()).toBeNull();

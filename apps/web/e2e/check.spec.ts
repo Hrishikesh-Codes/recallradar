@@ -110,7 +110,7 @@ test("type a product and get a verdict with its evidence", async ({ page }) => {
 test("Try it now on the home page runs the check on /check", async ({ page }) => {
   const api = await mockApi(page);
   await page.goto("/");
-  await page.getByLabel("Product, link, or barcode digits").fill("Peloton bike PL01");
+  await page.getByLabel("Product, link, barcode digits, or VIN").fill("Peloton bike PL01");
   await page.getByRole("button", { name: "Check", exact: true }).click();
   await expect(page).toHaveURL(/\/check$/);
   await expect(page.getByRole("heading", { level: 2, name: "Recalled" })).toBeVisible();
@@ -119,7 +119,7 @@ test("Try it now on the home page runs the check on /check", async ({ page }) =>
   expect(api.checks).toHaveLength(1);
 });
 
-test("links and barcodes are read as such", async ({ page }) => {
+test("links, barcodes, and VINs are read as such", async ({ page }) => {
   const api = await mockApi(page);
   await page.goto("/check");
   await page.getByRole("tab", { name: "Paste a link" }).click();
@@ -134,9 +134,16 @@ test("links and barcodes are read as such", async ({ page }) => {
   await page.getByRole("button", { name: "Check it" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Recalled" })).toBeVisible();
 
-  expect(api.checks.map((c) => (c as { input: { type: string } }).input.type)).toEqual([
-    "link",
-    "barcode",
+  await page.getByRole("button", { name: "Check another product" }).click();
+  await page.getByRole("tab", { name: "Vehicle VIN" }).click();
+  await page.getByLabel("Vehicle identification number (VIN)").fill("1hgcm82633a004352");
+  await page.getByRole("button", { name: "Check it" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Recalled" })).toBeVisible();
+
+  expect(api.checks.map((c) => (c as { input: { type: string } }).input)).toEqual([
+    { type: "link", value: "https://www.amazon.com/Peloton-Bike/dp/B000EXAMPL" },
+    { type: "barcode", value: "012345678905" },
+    { type: "vin", value: "1HGCM82633A004352" },
   ]);
 });
 

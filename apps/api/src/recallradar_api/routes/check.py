@@ -21,7 +21,7 @@ _TOO_MANY: dict[int | str, dict[str, Any]] = {
 def check_product(
     body: schemas.CheckRequest, request: Request, state: State, session: DbSession
 ) -> schemas.CheckResponse:
-    """Check one product (typed description, product link, or barcode) against every recall.
+    """Check one product (description, product link, barcode, or VIN) against every recall.
 
     No account needed. Nothing about the product is stored, only that a check happened.
     """
@@ -32,6 +32,7 @@ def check_product(
         embedder=state.embedder,
         barcodes=state.barcodes,
         coverage=state.coverage,
+        vins=state.vins,
     )
 
 

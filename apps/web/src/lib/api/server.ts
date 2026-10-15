@@ -65,7 +65,7 @@ export async function userFetch<T>(
 export function parseCheckInput(value: unknown): CheckInput | null {
   if (!value || typeof value !== "object") return null;
   const { type, value: text } = value as { type?: unknown; value?: unknown };
-  if (type !== "text" && type !== "link" && type !== "barcode") return null;
+  if (type !== "text" && type !== "link" && type !== "barcode" && type !== "vin") return null;
   if (typeof text !== "string" || !text.trim() || text.length > 2000) return null;
   return { type, value: text.trim() };
 }

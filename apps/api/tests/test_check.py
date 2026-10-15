@@ -1,7 +1,9 @@
 """POST /v1/check, /v1/feedback, /v1/recalls, /v1/stats against real fixture recalls."""
 
+import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -10,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from recallradar_api.checking import BarcodeLookups, CoverageCache
+from recallradar_api.checking import BarcodeLookups, CoverageCache, VinDecoder
 from recallradar_api.main import create_app
 from recallradar_api.ratelimit import RateLimiter
 from recallradar_api.state import AppState
@@ -19,6 +21,7 @@ from recallradar_core.settings import Settings
 from recallradar_matching.embed import Embedder
 
 pytestmark = [pytest.mark.db, pytest.mark.model]
+FIXTURES = Path(__file__).parents[3] / "tests" / "fixtures"
 
 OFF_PRODUCT = {
     "status": 1,
@@ -86,7 +89,7 @@ def test_text_check_returns_verdict_reasons_and_coverage(client: TestClient) -> 
     assert any("WL33006DMN" in reason for reason in match["reasons"])
     assert body["query"]["model_numbers"] == ["WL33006DMN"]
     coverage = body["coverage"]
-    assert {s["label"] for s in coverage["checked"]} == {"CPSC", "FDA"}
+    assert {s["label"] for s in coverage["checked"]} == {"CPSC", "FDA", "NHTSA"}
     assert coverage["recalls_checked"] == sum(s["recalls"] for s in coverage["checked"])
 
 
@@ -122,7 +125,7 @@ def test_listed_barcode_matches_without_a_lookup_hit(client: TestClient) -> None
 
 
 def test_invalid_input_is_rejected(client: TestClient) -> None:
-    response = client.post("/v1/check", json={"input": {"type": "vin", "value": "x"}})
+    response = client.post("/v1/check", json={"input": {"type": "photo", "value": "x"}})
     assert response.status_code == 422
     response = client.post("/v1/check", json={"input": {"type": "text", "value": ""}})
     assert response.status_code == 422
@@ -182,3 +185,18 @@ def test_recall_detail_and_stats(client: TestClient, sessions: sessionmaker[Sess
     stats = client.get("/v1/stats").json()
     assert stats["recalls"] == sum(s["recalls"] for s in stats["sources"]) > 0
     assert stats["products"] >= stats["recalls"]
+
+
+def test_vin_is_decoded_and_older_vehicles_are_flagged(state: AppState) -> None:
+    # vPIC's documented sample VIN decodes to a 2003 Honda Accord (fixture response).
+    body = json.loads((FIXTURES / "nhtsa" / "vpic_decode_1HGCM82633A004352.json").read_text())
+    vpic = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=body)))
+    state.vins = VinDecoder(vpic)
+    app = create_app(Settings(cors_origins=["http://localhost:3000"]), state=state)
+    with TestClient(app) as client:
+        result = post_check(client, "vin", "1HGCM82633A004352")
+    assert result["query"]["input_type"] == "vin"
+    assert result["query"]["product_name"] == "2003 HONDA Accord"
+    assert "We read this VIN as a 2003 HONDA Accord." in result["notes"]
+    # The fixture recalls cover 2018-2020 Hondas; a 2003 car may have recalls from before 2010.
+    assert result["verdict"] == "not_covered"

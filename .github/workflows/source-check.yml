@@ -1,0 +1,25 @@
+name: Check recall sources
+
+# Can GitHub's runners (where the daily sync runs) reach every recall source? Prints the HTTP
+# status and size of one small request per source. Run by hand from the Actions tab.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request each source once
+        run: |
+          check() {
+            printf '%-8s %s\n' "$1" "$(curl -s -o /dev/null -w '%{http_code} %{size_download}B' --max-time 60 \
+              -A 'RecallRadar/0.1 (+https://github.com/Hrishikesh-Codes/recallradar)' "$2")"
+          }
+          check CPSC   "https://www.saferproducts.gov/RestWebServices/Recall?format=json&RecallDateStart=2026-01-01&RecallDateEnd=2026-01-07"
+          check openFDA "https://api.fda.gov/food/enforcement.json?limit=1"
+          check NHTSA  "https://static.nhtsa.gov/odi/ffdd/rcl/RCL.txt"
+          check vPIC   "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/1HGCM82633A004352?format=json"
+          check FSIS   "https://www.fsis.usda.gov/fsis/api/recall/v/1"

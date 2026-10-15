@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from recallradar_core.enums import NoticeType, RecallSource, RecallStatus, RemedyType
 from recallradar_matching.engine import Tier
 
-InputKind = Literal["text", "link", "barcode", "vin"]
+InputKind = Literal["text", "link", "barcode", "vin", "label"]
 
 
 class CheckInput(BaseModel):
@@ -90,6 +90,11 @@ class SourceCoverage(BaseModel):
     label: str
     recalls: int
     last_synced_at: datetime | None
+
+
+class Identified(BaseModel):
+    query: QueryOut
+    notes: list[str]
 
 
 class Coverage(BaseModel):

@@ -45,8 +45,9 @@ def parse_text(raw: str) -> ProductQuery:
         if m.lstrip("0") not in barcode_digits
     ]
     lots = list(dict.fromkeys(labelled.lots + _LOT.findall(text)))
-    lot_set = set(lots)
-    models = [m for m in models if m not in lot_set]
+    # Codes labelled as lots, serials, or date codes aren't model numbers.
+    not_models = set(lots) | set(labelled.serials) | set(labelled.date_codes)
+    models = [m for m in models if m not in not_models]
 
     purchase = _purchase_date(text)
     confidence = {"product_name": 0.6}

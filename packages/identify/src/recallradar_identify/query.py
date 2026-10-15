@@ -51,6 +51,6 @@ class ProductQuery(BaseModel):
     def search_text(self) -> str:
         """Free text for lexical and semantic search. Only typed text falls back to the raw
         input: a barcode's digits or a link's URL aren't a description of the product."""
-        fallback = self.raw if self.input_type is InputType.TEXT else None
+        fallback = self.raw if self.input_type is InputType.TEXT else None  # label: name lines
         parts = [self.brand, self.product_name or fallback]
         return " ".join(p for p in parts if p).strip()

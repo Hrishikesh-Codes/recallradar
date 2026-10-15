@@ -20,7 +20,8 @@
               "text",
               "link",
               "barcode",
-              "vin"
+              "vin",
+              "label"
             ],
             "title": "Type",
             "type": "string"
@@ -278,6 +279,26 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "Identified": {
+        "properties": {
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "query": {
+            "$ref": "#/components/schemas/QueryOut"
+          }
+        },
+        "required": [
+          "query",
+          "notes"
+        ],
+        "title": "Identified",
+        "type": "object"
+      },
       "ItemMatchOut": {
         "properties": {
           "dismissed": {
@@ -329,7 +350,8 @@
               "text",
               "link",
               "barcode",
-              "vin"
+              "vin",
+              "label"
             ],
             "title": "Input Type",
             "type": "string"
@@ -1360,6 +1382,51 @@
           }
         },
         "summary": "Feedback",
+        "tags": [
+          "check"
+        ]
+      }
+    },
+    "/v1/identify": {
+      "post": {
+        "description": "How we read an input, without checking it: lets people fix OCR mistakes first.",
+        "operationId": "identify_v1_identify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identified"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited; see Retry-After."
+          }
+        },
+        "summary": "Identify",
         "tags": [
           "check"
         ]

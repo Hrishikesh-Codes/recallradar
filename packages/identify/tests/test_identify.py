@@ -7,6 +7,7 @@ import pytest
 
 from recallradar_core.categories import Category
 from recallradar_identify import barcode, link, text, vin
+from recallradar_identify.parse import parse_input
 from recallradar_identify.query import InputType, Vehicle
 
 
@@ -189,3 +190,30 @@ class TestVin:
         query = vin.parse_vin(raw, lambda value: pytest.fail("must not decode"))
         assert query.vehicle is None
         assert "17 letters and numbers" in query.notes[0]
+
+
+class TestLabel:
+    def test_label_text_gives_name_and_codes(self) -> None:
+        # The shape of OCR output from a product's rating sticker: short lines, labels, noise.
+        text = "\n".join(
+            [
+                "DR POWER",
+                "LEAF VACUUM",
+                "| ~ ;",
+                "MODEL: WL33006DMN",
+                "SERIAL NO. 18A0042317",
+                "MFD 03/2021",
+                "120V 60Hz 6.5A",
+            ]
+        )
+        query = parse_input("label", text)
+        assert query.input_type is InputType.LABEL_PHOTO
+        assert query.product_name == "DR POWER LEAF VACUUM"
+        assert query.model_numbers == ["WL33006DMN"]
+        assert query.search_text() == "DR POWER LEAF VACUUM"
+        assert all(value <= 0.5 for value in query.confidence.values())
+        assert "Fix anything we misread" in query.notes[-1]
+
+    def test_barcode_digits_in_label_text_are_found(self) -> None:
+        query = parse_input("label", "BUILT\nLUUM TUMBLER\n843461115513")
+        assert query.upcs == ["00843461115513"]

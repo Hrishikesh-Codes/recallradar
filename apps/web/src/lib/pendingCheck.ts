@@ -31,7 +31,7 @@ function take(key: string): CheckInput | null {
       typeof parsed === "object" &&
       "type" in parsed &&
       "value" in parsed &&
-      ["text", "link", "barcode", "vin"].includes(String(parsed.type)) &&
+      ["text", "link", "barcode", "vin", "label"].includes(String(parsed.type)) &&
       typeof parsed.value === "string"
     ) {
       return parsed as CheckInput;

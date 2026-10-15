@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party engines copied from node_modules by scripts/copy-wasm.mjs.
+    "public/ocr/**",
+    "public/wasm/**",
   ]),
 ]);
 

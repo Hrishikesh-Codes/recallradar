@@ -69,3 +69,14 @@ export function sendFeedback(body: {
 }): Promise<unknown> {
   return request("/v1/feedback", { method: "POST", body: JSON.stringify(body) });
 }
+
+export type Identified = Schemas["Identified"];
+
+/** How the API reads an input, without checking it (for previews before a check). */
+export function identify(input: CheckInput, signal?: AbortSignal): Promise<Identified> {
+  return request<Identified>("/v1/identify", {
+    method: "POST",
+    body: JSON.stringify({ input, purchase_date: null }),
+    signal: signal ?? null,
+  });
+}

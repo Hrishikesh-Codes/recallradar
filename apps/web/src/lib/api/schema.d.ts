@@ -83,6 +83,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/identify": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Identify
+     * @description How we read an input, without checking it: lets people fix OCR mistakes first.
+     */
+    post: operations["identify_v1_identify_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/me": {
     parameters: {
       query?: never;
@@ -343,7 +363,7 @@ export interface components {
        * Type
        * @enum {string}
        */
-      type: "text" | "link" | "barcode" | "vin";
+      type: "text" | "link" | "barcode" | "vin" | "label";
       /** Value */
       value: string;
     };
@@ -443,6 +463,12 @@ export interface components {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** Identified */
+    Identified: {
+      /** Notes */
+      notes: string[];
+      query: components["schemas"]["QueryOut"];
+    };
     /** ItemMatchOut */
     ItemMatchOut: {
       /** Dismissed */
@@ -470,7 +496,7 @@ export interface components {
        * Input Type
        * @enum {string}
        */
-      input_type: "text" | "link" | "barcode" | "vin";
+      input_type: "text" | "link" | "barcode" | "vin" | "label";
       /** Input Value */
       input_value: string;
       /** Label */
@@ -862,6 +888,46 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Rate limited; see Retry-After. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  identify_v1_identify_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Identified"];
+        };
       };
       /** @description Validation Error */
       422: {

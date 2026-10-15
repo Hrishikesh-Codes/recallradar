@@ -3,6 +3,7 @@
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { BarcodeScanner } from "@/components/check/BarcodeScanner";
+import { LabelPhoto } from "@/components/check/LabelPhoto";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import type { CheckInput } from "@/lib/api/client";
@@ -14,6 +15,7 @@ const MODES: ReadonlyArray<{ mode: Mode; label: string }> = [
   { mode: "text", label: "Describe it" },
   { mode: "link", label: "Paste a link" },
   { mode: "barcode", label: "Scan barcode" },
+  { mode: "label", label: "Photo of label" },
   { mode: "vin", label: "Vehicle VIN" },
 ];
 
@@ -45,6 +47,7 @@ export function CheckForm({
     link: "",
     barcode: "",
     vin: "",
+    label: "",
   });
   const tabs = useRef<Array<HTMLButtonElement | null>>([]);
   const baseId = useId();
@@ -107,7 +110,10 @@ export function CheckForm({
             }}
           />
         ) : null}
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        {mode === "label" ? (
+          <LabelPhoto onSubmit={onSubmit} disabled={disabled} submitLabel={submitLabel} />
+        ) : null}
+        <form onSubmit={submit} className={mode === "label" ? "hidden" : "flex flex-col gap-4"}>
           {mode === "text" ? (
             <TextField
               label="What is it?"

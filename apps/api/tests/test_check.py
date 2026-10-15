@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from recallradar_api.checking import BarcodeLookups, CoverageCache, VinDecoder
@@ -200,3 +200,20 @@ def test_vin_is_decoded_and_older_vehicles_are_flagged(state: AppState) -> None:
     assert "We read this VIN as a 2003 HONDA Accord." in result["notes"]
     # The fixture recalls cover 2018-2020 Hondas; a 2003 car may have recalls from before 2010.
     assert result["verdict"] == "not_covered"
+
+
+def test_identify_reads_without_checking(
+    client: TestClient, sessions: sessionmaker[Session]
+) -> None:
+    with sessions() as session:
+        before = session.scalar(select(func.count()).select_from(Event))
+    response = client.post(
+        "/v1/identify",
+        json={"input": {"type": "label", "value": "DR POWER\nLEAF VACUUM\nMODEL: WL33006DMN"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["query"]["model_numbers"] == ["WL33006DMN"]
+    assert body["query"]["input_type"] == "label_photo"
+    with sessions() as session:
+        assert session.scalar(select(func.count()).select_from(Event)) == before

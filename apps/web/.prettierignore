@@ -4,3 +4,5 @@ pnpm-lock.yaml
 playwright-report
 test-results
 src/lib/api/openapi.json
+public/ocr
+public/wasm

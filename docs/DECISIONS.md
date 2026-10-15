@@ -37,6 +37,21 @@ why, and what it costs.
 - **NHTSA recalls are emailed too.** The CPSC-only rule came from openFDA's terms; NHTSA's data has
   no such restriction.
 
+### Label photos
+
+- **OCR runs in the browser (Tesseract.js 7), so photos never leave the device;** only the text
+  is sent, after the user has seen and corrected it. The engine (LSTM builds, about 3.9 MB each;
+  a browser loads one) and the compact English model (2.9 MB) are copied from `node_modules` at
+  build time and served from our origin, like the barcode reader.
+- **`/v1/identify` reads an input without checking it,** so the screen shows the model, lot, and
+  barcode it found while the user fixes the text. It counts against the same rate limit and
+  records nothing.
+- **Label text is parsed for codes like typed text,** but the product name comes from the
+  wordiest lines, skipping labelled code lines (`MODEL:`, `SERIAL NO.`, `MFD`), and codes the
+  scanner labelled as serials, lots, or date codes are never treated as model numbers.
+- **Tested with real OCR in Playwright** on a label rendered in the page (desktop only: OCR
+  takes seconds). The spec asks for real photos too; that set comes from the owner's own items.
+
 ### Installable app and web push
 
 - **Manifest and icons come from Next.js metadata routes** (`app/manifest.ts`, `app/icon.tsx`):

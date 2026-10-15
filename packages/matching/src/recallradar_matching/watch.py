@@ -38,7 +38,12 @@ def cached_lookup(session: Session) -> Lookup:
     return lookup
 
 
-_KINDS: dict[str, InputKind] = {"link": "link", "barcode": "barcode", "vin": "vin"}
+_KINDS: dict[str, InputKind] = {
+    "link": "link",
+    "barcode": "barcode",
+    "vin": "vin",
+    "label": "label",
+}
 
 
 def item_query(

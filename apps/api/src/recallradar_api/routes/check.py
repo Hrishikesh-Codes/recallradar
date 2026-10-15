@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from recallradar_api import schemas
-from recallradar_api.checking import run_check
+from recallradar_api.checking import build_query, query_out, run_check
 from recallradar_api.ratelimit import client_key, enforce
 from recallradar_api.state import DbSession, State
 from recallradar_core.db import Feedback, Recall
@@ -34,6 +34,16 @@ def check_product(
         coverage=state.coverage,
         vins=state.vins,
     )
+
+
+@router.post("/identify", responses=_TOO_MANY)
+def identify(
+    body: schemas.CheckRequest, request: Request, state: State, session: DbSession
+) -> schemas.Identified:
+    """How we read an input, without checking it: lets people fix OCR mistakes first."""
+    enforce(state.check_limits, client_key(request))
+    query = build_query(session, body, state.barcodes, state.vins)
+    return schemas.Identified(query=query_out(query), notes=query.notes)
 
 
 @router.post(

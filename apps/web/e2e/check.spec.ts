@@ -77,6 +77,19 @@ async function mockApi(page: Page) {
     checks.push(route.request().postDataJSON());
     await route.fulfill({ json: RESULT });
   });
+  await page.route("**/v1/identify", (route) =>
+    route.fulfill({
+      json: {
+        query: {
+          ...RESULT.query,
+          input_type: "label_photo",
+          product_name: "DR POWER LEAF VACUUM",
+          model_numbers: ["WL33006DMN"],
+        },
+        notes: [],
+      },
+    }),
+  );
   await page.route("**/v1/feedback", async (route) => {
     feedback.push(route.request().postDataJSON());
     await route.fulfill({ status: 202, json: { status: "accepted" } });
@@ -156,4 +169,41 @@ test("a rate-limited check explains itself", async ({ page }) => {
   await page.getByRole("button", { name: "Check it" }).click();
   // Scoped to main: Next.js adds its own role="alert" route announcer.
   await expect(page.getByRole("main").getByRole("alert")).toHaveText(/Too many checks/);
+});
+
+test("a label photo is read on the device and checked as text", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "real OCR is slow; one browser is enough");
+  test.setTimeout(120_000);
+  const api = await mockApi(page);
+  await page.goto("/check");
+  // A label rendered in the browser: real OCR (self-hosted Tesseract.js) reads it back.
+  const png = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 900;
+    canvas.height = 340;
+    const g = canvas.getContext("2d")!;
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.fillStyle = "#000";
+    g.font = "bold 56px Arial";
+    g.fillText("DR POWER", 40, 90);
+    g.fillText("LEAF VACUUM", 40, 170);
+    g.font = "48px Arial";
+    g.fillText("MODEL: WL33006DMN", 40, 270);
+    return canvas.toDataURL("image/png").split(",")[1]!;
+  });
+  await page.getByRole("tab", { name: "Photo of label" }).click();
+  await page.getByLabel("Photo of the product label").setInputFiles({
+    name: "label.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(png, "base64"),
+  });
+  const text = page.getByRole("textbox", { name: /What we read/ });
+  await expect(text).toHaveValue(/WL33006DMN/, { timeout: 90_000 });
+  await expect(page.getByText("DR POWER LEAF VACUUM")).toBeVisible();
+  await page.getByRole("button", { name: "Check it" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Recalled" })).toBeVisible();
+  const last = api.checks.at(-1) as { input: { type: string; value: string } };
+  expect(last.input.type).toBe("label");
+  expect(last.input.value).toContain("WL33006DMN");
 });

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { deleteAccount, signOut, updateAlerts } from "@/app/account/actions";
+import { PushToggle } from "@/components/account/PushToggle";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { getViewer, userFetch, type Me } from "@/lib/api/server";
@@ -72,6 +73,13 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
           </Button>
         </form>
       </Card>
+
+      {me.is_anonymous ? null : (
+        <Card innerClassName="flex flex-col gap-4 p-5">
+          <h2 className="eyebrow text-muted-2">Push notifications</h2>
+          <PushToggle />
+        </Card>
+      )}
 
       <Card innerClassName="flex flex-col gap-4 p-5">
         <h2 className="eyebrow text-muted-2">Your data</h2>

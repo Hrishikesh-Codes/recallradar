@@ -36,3 +36,35 @@ export async function deleteAccount(formData: FormData): Promise<void> {
   await auth.api.signOut({ headers: await headers() }).catch(() => undefined);
   redirect("/?deleted=1");
 }
+
+type PushJson = { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+
+/** Store this browser's push subscription for the signed-in user. */
+export async function savePush(subscription: unknown): Promise<{ ok: boolean; message?: string }> {
+  const viewer = await getViewer();
+  if (!viewer || viewer.isAnonymous)
+    return { ok: false, message: "Sign in with your email first." };
+  const { endpoint, keys } = (subscription ?? {}) as PushJson;
+  if (
+    typeof endpoint !== "string" ||
+    !endpoint.startsWith("https://") ||
+    typeof keys?.p256dh !== "string" ||
+    typeof keys.auth !== "string"
+  ) {
+    return { ok: false, message: "This browser returned an unusable subscription." };
+  }
+  await userFetch(viewer.id, "/v1/me/push", {
+    method: "PUT",
+    body: JSON.stringify({ endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } }),
+  });
+  return { ok: true };
+}
+
+export async function removePush(endpoint: unknown): Promise<void> {
+  const viewer = await getViewer();
+  if (!viewer || typeof endpoint !== "string") return;
+  await userFetch(viewer.id, "/v1/me/push/remove", {
+    method: "POST",
+    body: JSON.stringify({ endpoint }),
+  });
+}

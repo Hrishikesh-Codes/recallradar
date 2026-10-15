@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 
 import { displayFace, textFace } from "@/app/fonts";
 import { SiteFooter } from "@/components/site/SiteFooter";
+import { ServiceWorker } from "@/components/pwa/ServiceWorker";
 import { SiteNav } from "@/components/site/SiteNav";
 import { cn } from "@/lib/cn";
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteNav />
         <main id="main">{children}</main>
         <SiteFooter />
+        <ServiceWorker />
       </body>
     </html>
   );

@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Outgoing mail for alerts: smtp://localhost:1025 (Mailpit) locally, Resend's SMTP in prod.
     smtp_url: SecretStr | None = None
     mail_from: str = "RecallRadar <alerts@localhost>"
+    # Web Push (VAPID). The public key goes to the web app as NEXT_PUBLIC_VAPID_PUBLIC_KEY.
+    vapid_private_key: SecretStr | None = None
+    vapid_subject: str = "mailto:alerts@localhost"
 
     @field_validator("database_url")
     @classmethod

@@ -192,3 +192,20 @@ class Export(BaseModel):
     settings: SettingsOut
     items: list[ItemOut]
     alerts: list[dict[str, object]]
+    push_devices: int = Field(description="Browsers with push notifications turned on")
+
+
+class PushKeys(BaseModel):
+    p256dh: str = Field(min_length=20, max_length=200)
+    auth: str = Field(min_length=8, max_length=100)
+
+
+class PushSubscriptionIn(BaseModel):
+    """What a browser's PushManager.subscribe() returns (serialised)."""
+
+    endpoint: str = Field(pattern=r"^https://", max_length=1000)
+    keys: PushKeys
+
+
+class PushEndpoint(BaseModel):
+    endpoint: str = Field(max_length=1000)

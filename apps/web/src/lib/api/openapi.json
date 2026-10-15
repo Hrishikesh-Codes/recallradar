@@ -195,6 +195,11 @@
             "title": "Items",
             "type": "array"
           },
+          "push_devices": {
+            "description": "Browsers with push notifications turned on",
+            "title": "Push Devices",
+            "type": "integer"
+          },
           "settings": {
             "$ref": "#/components/schemas/SettingsOut"
           }
@@ -204,7 +209,8 @@
           "account",
           "settings",
           "items",
-          "alerts"
+          "alerts",
+          "push_devices"
         ],
         "title": "Export",
         "type": "object"
@@ -538,7 +544,8 @@
       "NoticeType": {
         "enum": [
           "recall",
-          "warning"
+          "warning",
+          "alert"
         ],
         "title": "NoticeType",
         "type": "string"
@@ -649,6 +656,62 @@
           "quantity"
         ],
         "title": "ProductOut",
+        "type": "object"
+      },
+      "PushEndpoint": {
+        "properties": {
+          "endpoint": {
+            "maxLength": 1000,
+            "title": "Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint"
+        ],
+        "title": "PushEndpoint",
+        "type": "object"
+      },
+      "PushKeys": {
+        "properties": {
+          "auth": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Auth",
+            "type": "string"
+          },
+          "p256dh": {
+            "maxLength": 200,
+            "minLength": 20,
+            "title": "P256Dh",
+            "type": "string"
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushKeys",
+        "type": "object"
+      },
+      "PushSubscriptionIn": {
+        "description": "What a browser's PushManager.subscribe() returns (serialised).",
+        "properties": {
+          "endpoint": {
+            "maxLength": 1000,
+            "pattern": "^https://",
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushKeys"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "title": "PushSubscriptionIn",
         "type": "object"
       },
       "QueryOut": {
@@ -1787,6 +1850,111 @@
           }
         },
         "summary": "Restore Match",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/v1/me/push": {
+      "put": {
+        "description": "Turn on push notifications for this browser (re-subscribing moves it to this user).",
+        "operationId": "save_push_v1_me_push_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Push",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/v1/me/push/remove": {
+      "post": {
+        "operationId": "remove_push_v1_me_push_remove_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushEndpoint"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Push",
         "tags": [
           "account"
         ]

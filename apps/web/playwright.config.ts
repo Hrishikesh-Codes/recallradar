@@ -12,6 +12,9 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
+    // A registered service worker can take requests past page.route() mocks; pwa.spec.ts
+    // allows it where the worker itself is under test.
+    serviceWorkers: "block",
   },
   projects: [
     {

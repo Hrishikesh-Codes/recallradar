@@ -27,6 +27,9 @@ class NoticeType(StrEnum):
     RECALL = "recall"
     # CPSC "warns consumers" when a firm won't agree to a recall. Not a recall: never call it one.
     WARNING = "warning"
+    # USDA FSIS public health alert: product that can't be recalled (often no longer for sale, or
+    # illegally imported) but shouldn't be eaten. Also not a recall.
+    ALERT = "alert"
 
 
 class RemedyType(StrEnum):

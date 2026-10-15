@@ -8,9 +8,17 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from recallradar_core.db import Alert, AuthUser, Recall, RecallProduct, UserSettings, WatchItem
+from recallradar_core.db import (
+    Alert,
+    AuthUser,
+    PushSubscription,
+    Recall,
+    RecallProduct,
+    UserSettings,
+    WatchItem,
+)
 from recallradar_core.enums import RecallSource
-from recallradar_jobs.alerts import delete_old_demo_accounts, run
+from recallradar_jobs.alerts import PushGoneError, delete_old_demo_accounts, run
 from recallradar_matching.embed import Embedder
 
 pytestmark = [pytest.mark.db, pytest.mark.model]
@@ -142,3 +150,57 @@ def test_old_demo_accounts_are_deleted(sessions: sessionmaker[Session]) -> None:
         items = session.scalars(select(WatchItem)).all()
     assert remaining == {"new-demo", "old-real"}
     assert items == []
+
+
+class PushBox:
+    def __init__(self, gone: set[str] | None = None) -> None:
+        self.sent: list[tuple[str, dict[str, str]]] = []
+        self.gone = gone or set()
+
+    def __call__(self, subscription: PushSubscription, payload: dict[str, str]) -> None:
+        if subscription.endpoint in self.gone:
+            raise PushGoneError("410")
+        self.sent.append((subscription.endpoint, payload))
+
+
+def test_push_goes_to_every_device_once_and_dead_ones_are_removed(
+    sessions: sessionmaker[Session], embedder: Embedder
+) -> None:
+    with sessions.begin() as session:
+        user(session, "u1")
+        watch(session, "u1", "DR Power leaf vacuum WL33006DMN")
+        for endpoint in ("https://push.example/phone", "https://push.example/old-laptop"):
+            session.add(
+                PushSubscription(user_id="u1", endpoint=endpoint, p256dh="p" * 40, auth="a" * 16)
+            )
+    pushes = PushBox(gone={"https://push.example/old-laptop"})
+    stats = run(
+        sessions,
+        embedder,
+        ingested=INGESTED,
+        sender=Outbox(),
+        mail_from="RecallRadar <alerts@example.com>",
+        web_url="https://recallradar.example",
+        push_sender=pushes,
+    )
+    assert stats.pushes_sent == 1
+    ((endpoint, payload),) = pushes.sent
+    assert endpoint == "https://push.example/phone"
+    assert payload["title"] == "Recall: DR Power leaf vacuum WL33006DMN"
+    assert payload["url"] == "https://recallradar.example/list"
+    with sessions() as session:
+        endpoints = set(session.scalars(select(PushSubscription.endpoint)))
+        channels = {(a.channel, a.status) for a in session.scalars(select(Alert))}
+    assert endpoints == {"https://push.example/phone"}
+    assert channels == {("email", "sent"), ("push", "sent")}
+
+    again = run(
+        sessions,
+        embedder,
+        ingested=INGESTED,
+        sender=Outbox(),
+        mail_from="RecallRadar <alerts@example.com>",
+        web_url="https://recallradar.example",
+        push_sender=pushes,
+    )
+    assert again.pushes_sent == 0 and len(pushes.sent) == 1

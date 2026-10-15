@@ -37,6 +37,21 @@ why, and what it costs.
 - **NHTSA recalls are emailed too.** The CPSC-only rule came from openFDA's terms; NHTSA's data has
   no such restriction.
 
+### Installable app and web push
+
+- **Manifest and icons come from Next.js metadata routes** (`app/manifest.ts`, `app/icon.tsx`):
+  the icons are rendered at build time from the logo's SVG, so no binary images live in the
+  repo. The mark sits inside the maskable safe zone.
+- **The service worker does two things only:** an offline page for navigations, and Web Push.
+  It never caches recall data or API responses: a stale verdict is worse than none. It
+  registers in production builds only; tests that mock the API block it (a controlling worker
+  can take requests past Playwright's mocks).
+- **Push is per device and opt-in** from the account page, for signed-in (not demo) users.
+  iPhones need the app added to the Home Screen first (iOS 16.4+), which the toggle explains.
+  Alerts follow the email rules (one per item, recall, and channel; no FDA), at most one
+  notification per user per run; subscriptions the push service reports gone (404/410) are
+  deleted. Sent with `pywebpush` and VAPID keys from the environment.
+
 ## M1 — Thin slice (2026-10-13 to 10-14)
 
 ### Recall data

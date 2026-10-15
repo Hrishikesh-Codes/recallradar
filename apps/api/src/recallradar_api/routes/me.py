@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from recallradar_api import schemas
@@ -16,6 +17,7 @@ from recallradar_core.db import (
     Alert,
     AuthUser,
     AuthVerification,
+    PushSubscription,
     Recall,
     UserSettings,
     WatchItem,
@@ -223,6 +225,37 @@ def seed_demo(user: CurrentUser, state: State, session: DbSession) -> list[schem
     return list_items(user, session)
 
 
+@router.put("/push", status_code=status.HTTP_204_NO_CONTENT)
+def save_push(body: schemas.PushSubscriptionIn, user: CurrentUser, session: DbSession) -> Response:
+    """Turn on push notifications for this browser (re-subscribing moves it to this user)."""
+    if user.is_anonymous:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Sign in with email to get alerts.")
+    values = {
+        "user_id": user.id,
+        "endpoint": body.endpoint,
+        "p256dh": body.keys.p256dh,
+        "auth": body.keys.auth,
+    }
+    statement = insert(PushSubscription).values(**values)
+    session.execute(
+        statement.on_conflict_do_update(
+            index_elements=[PushSubscription.endpoint],
+            set_={k: statement.excluded[k] for k in ("user_id", "p256dh", "auth")},
+        )
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/push/remove", status_code=status.HTTP_204_NO_CONTENT)
+def remove_push(body: schemas.PushEndpoint, user: CurrentUser, session: DbSession) -> Response:
+    session.execute(
+        delete(PushSubscription).where(
+            PushSubscription.user_id == user.id, PushSubscription.endpoint == body.endpoint
+        )
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/export")
 def export(user: CurrentUser, session: DbSession) -> schemas.Export:
     alerts = session.scalars(select(Alert).where(Alert.user_id == user.id)).all()
@@ -236,6 +269,8 @@ def export(user: CurrentUser, session: DbSession) -> schemas.Export:
         settings=_settings_out(_settings(session, user)),
         items=list_items(user, session),
         alerts=[_alert_dict(a) for a in alerts],
+        push_devices=session.scalar(select(func.count()).where(PushSubscription.user_id == user.id))
+        or 0,
     )
 
 

@@ -216,6 +216,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/me/push": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Save Push
+     * @description Turn on push notifications for this browser (re-subscribing moves it to this user).
+     */
+    put: operations["save_push_v1_me_push_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/push/remove": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Remove Push */
+    post: operations["remove_push_v1_me_push_remove_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/me/settings": {
     parameters: {
       query?: never;
@@ -376,6 +413,11 @@ export interface components {
       exported_at: string;
       /** Items */
       items: components["schemas"]["ItemOut"][];
+      /**
+       * Push Devices
+       * @description Browsers with push notifications turned on
+       */
+      push_devices: number;
       settings: components["schemas"]["SettingsOut"];
     };
     /** FeedbackRequest */
@@ -501,7 +543,7 @@ export interface components {
      * NoticeType
      * @enum {string}
      */
-    NoticeType: "recall" | "warning";
+    NoticeType: "recall" | "warning" | "alert";
     /** ProductOut */
     ProductOut: {
       /** Brand */
@@ -526,6 +568,27 @@ export interface components {
       upcs: string[];
       /** Where To Look */
       where_to_look: string[];
+    };
+    /** PushEndpoint */
+    PushEndpoint: {
+      /** Endpoint */
+      endpoint: string;
+    };
+    /** PushKeys */
+    PushKeys: {
+      /** Auth */
+      auth: string;
+      /** P256Dh */
+      p256dh: string;
+    };
+    /**
+     * PushSubscriptionIn
+     * @description What a browser's PushManager.subscribe() returns (serialised).
+     */
+    PushSubscriptionIn: {
+      /** Endpoint */
+      endpoint: string;
+      keys: components["schemas"]["PushKeys"];
     };
     /**
      * QueryOut
@@ -1093,6 +1156,72 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["ItemOut"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_push_v1_me_push_put: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PushSubscriptionIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remove_push_v1_me_push_remove_post: {
+    parameters: {
+      query?: never;
+      header?: {
+        authorization?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PushEndpoint"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

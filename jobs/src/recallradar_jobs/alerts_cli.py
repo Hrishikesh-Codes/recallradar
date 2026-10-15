@@ -16,7 +16,7 @@ from recallradar_core.db.session import get_sessionmaker
 from recallradar_core.logs import configure_logging
 from recallradar_core.settings import get_settings
 from recallradar_identify.vin import decode_vpic
-from recallradar_jobs.alerts import run, smtp_sender
+from recallradar_jobs.alerts import run, smtp_sender, vapid_push_sender
 from recallradar_matching.embed import Embedder
 
 
@@ -38,9 +38,14 @@ def main(argv: list[str] | None = None) -> int:
         mail_from=settings.mail_from,
         web_url=settings.web_url,
         decode_vin=lambda vin: decode_vpic(client, vin),
+        push_sender=vapid_push_sender(
+            settings.vapid_private_key.get_secret_value(), settings.vapid_subject
+        )
+        if settings.vapid_private_key
+        else None,
     )
     print(json.dumps(asdict(stats)))
-    return 1 if stats.emails_failed else 0
+    return 1 if stats.emails_failed or stats.pushes_failed else 0
 
 
 if __name__ == "__main__":

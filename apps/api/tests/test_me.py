@@ -19,7 +19,7 @@ from recallradar_api.main import create_app
 from recallradar_api.ratelimit import RateLimiter
 from recallradar_api.routes.me import DEMO_ITEMS
 from recallradar_api.state import AppState
-from recallradar_core.db import AuthUser, WatchItem, WatchMatch
+from recallradar_core.db import AuthUser, PushSubscription, WatchItem, WatchMatch
 from recallradar_core.settings import Settings, get_settings
 from recallradar_matching.embed import Embedder
 
@@ -158,3 +158,27 @@ def test_export_and_delete(client: TestClient, sessions: sessionmaker[Session]) 
 def test_secret_must_be_long(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ValueError, match="at least 32"):
         Settings(api_token_secret=SecretStr("short"))
+
+
+def test_push_subscriptions(client: TestClient, sessions: sessionmaker[Session]) -> None:
+    body = {"endpoint": "https://push.example/abc", "keys": {"p256dh": "p" * 40, "auth": "a" * 16}}
+    assert client.put("/v1/me/push", json=body, headers=token("anon")).status_code == 403
+    assert (
+        client.put(
+            "/v1/me/push", json={**body, "endpoint": "http://insecure"}, headers=token("u1")
+        ).status_code
+        == 422
+    )
+    assert client.put("/v1/me/push", json=body, headers=token("u1")).status_code == 204
+    # The same browser signing in as someone else moves the subscription.
+    assert client.put("/v1/me/push", json=body, headers=token("u2")).status_code == 204
+    with sessions() as session:
+        owners = [s.user_id for s in session.scalars(select(PushSubscription))]
+    assert owners == ["u2"]
+    assert client.get("/v1/me/export", headers=token("u2")).json()["push_devices"] == 1
+    removed = client.post(
+        "/v1/me/push/remove", json={"endpoint": body["endpoint"]}, headers=token("u2")
+    )
+    assert removed.status_code == 204
+    with sessions() as session:
+        assert session.scalar(select(func.count()).select_from(PushSubscription)) == 0

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Scheduled job entrypoints (sync -> match -> alert), run by GitHub Actions cron"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "pywebpush>=2.5",
     "recallradar-core",
     "recallradar-identify",
     "recallradar-ingest",

@@ -161,6 +161,20 @@ class Alert(Base):
 
     __table_args__ = (
         UniqueConstraint("item_id", "recall_id", "channel"),
-        CheckConstraint("channel IN ('email')", name="channel"),
+        CheckConstraint("channel IN ('email', 'push')", name="channel"),
         CheckConstraint("status IN ('pending', 'sent', 'failed', 'skipped')", name="status"),
     )
+
+
+class PushSubscription(Base):
+    """A browser's Web Push subscription (one per device the user turned notifications on)."""
+
+    __tablename__ = "push_subscription"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[str] = mapped_column(_user_fk(), index=True)
+    endpoint: Mapped[str] = mapped_column(unique=True)
+    p256dh: Mapped[str]
+    auth: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    last_success_at: Mapped[datetime | None]

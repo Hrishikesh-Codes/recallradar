@@ -1,13 +1,14 @@
 """Re-check watched items and email users about recalls that newly match them (SPEC §8).
 
 - One alert per item per recall per channel: the alert table's unique constraint enforces it.
-- Email for CPSC and NHTSA recalls. openFDA's terms say its data must not be used to alert the
-  public, so FDA matches show up in the app's list and are recorded here as "skipped".
+- Email for CPSC, NHTSA, and USDA FSIS recalls. openFDA's terms say its data must not be used to
+  alert the public, so FDA matches show up in the app's list and are recorded here as "skipped".
 - No email for demo (anonymous) accounts, unverified addresses, or users who turned alerts off.
 - One email per user per run, listing everything new for them, in a calm tone.
 """
 
 import html
+import json
 import logging
 import smtplib
 import ssl
@@ -20,11 +21,19 @@ from email.message import EmailMessage
 from email.utils import make_msgid
 from urllib.parse import unquote, urlsplit
 
+from pywebpush import WebPushException, webpush
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
-from recallradar_core.db import Alert, AuthUser, Recall, UserSettings, WatchItem
+from recallradar_core.db import (
+    Alert,
+    AuthUser,
+    PushSubscription,
+    Recall,
+    UserSettings,
+    WatchItem,
+)
 from recallradar_core.enums import SOURCE_LABELS, NoticeType, RecallSource
 from recallradar_identify.vin import Decoder
 from recallradar_matching.embed import Embedder
@@ -33,7 +42,7 @@ from recallradar_matching.watch import refresh
 
 logger = logging.getLogger("recallradar.jobs.alerts")
 
-EMAIL_SOURCES = frozenset({RecallSource.CPSC, RecallSource.NHTSA})
+EMAIL_SOURCES = frozenset({RecallSource.CPSC, RecallSource.NHTSA, RecallSource.FSIS})
 DEFAULT_TIERS = ("recalled", "check_unit")
 TIER_WORDS = {Tier.RECALLED.value: "Recalled", Tier.CHECK_UNIT.value: "Check your unit"}
 
@@ -50,6 +59,8 @@ class RunStats:
     skipped: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     emails_sent: int = 0
     emails_failed: int = 0
+    pushes_sent: int = 0
+    pushes_failed: int = 0
     seconds: float = 0.0
 
 
@@ -65,6 +76,95 @@ class Outgoing:
 
 
 Sender = Callable[[EmailMessage], None]
+
+
+class PushGoneError(Exception):
+    """The browser dropped the subscription (HTTP 404/410): delete it."""
+
+
+# Sends one notification payload to one subscription; raises PushGoneError for dead ones.
+PushSender = Callable[[PushSubscription, dict[str, str]], None]
+
+
+def vapid_push_sender(private_key: str, subject: str) -> PushSender:
+    def send(subscription: PushSubscription, payload: dict[str, str]) -> None:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": subscription.endpoint,
+                    "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
+                },
+                data=json.dumps(payload),
+                vapid_private_key=private_key,
+                vapid_claims={"sub": subject},
+                ttl=86_400,
+                timeout=15,
+            )
+        except WebPushException as error:
+            status = getattr(error.response, "status_code", None)
+            if status in (404, 410):
+                raise PushGoneError(str(status)) from error
+            raise
+
+    return send
+
+
+def send_pushes(
+    sessions: sessionmaker[Session], sender: PushSender, web_url: str
+) -> tuple[int, int]:
+    """One notification per user per run, to every device they turned push on for."""
+    sent = failed = 0
+    with sessions() as session:
+        user_ids = list(
+            session.scalars(
+                select(Alert.user_id)
+                .where(Alert.status == "pending", Alert.channel == "push")
+                .distinct()
+            )
+        )
+    for user_id in user_ids:
+        with sessions.begin() as session:
+            rows = session.execute(
+                select(Alert, WatchItem, Recall)
+                .join(WatchItem, WatchItem.id == Alert.item_id)
+                .join(Recall, Recall.id == Alert.recall_id)
+                .where(Alert.user_id == user_id, Alert.status == "pending", Alert.channel == "push")
+                .order_by(Alert.id)
+            ).all()
+            labels = list(dict.fromkeys(" ".join(item.label.split()) for _, item, _ in rows))
+            first_recall = rows[0][2]
+            payload = {
+                "title": f"Recall: {labels[0]}"
+                if len(labels) == 1
+                else f"Recalls match {len(labels)} items on your list",
+                "body": truncate_text(first_recall.title, 160),
+                "url": f"{web_url.rstrip('/')}/list",
+                "tag": f"recalls-{user_id}",
+            }
+            delivered = False
+            for subscription in session.scalars(
+                select(PushSubscription).where(PushSubscription.user_id == user_id)
+            ):
+                try:
+                    sender(subscription, payload)
+                except PushGoneError:
+                    session.delete(subscription)
+                    continue
+                except Exception:
+                    logger.warning("push failed", exc_info=True)
+                    continue
+                subscription.last_success_at = datetime.now(UTC)
+                delivered = True
+            for alert, _, _ in rows:
+                alert.status = "sent" if delivered else "failed"
+                alert.sent_at = datetime.now(UTC) if delivered else None
+            sent += delivered
+            failed += not delivered
+    return sent, failed
+
+
+def truncate_text(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "\u2026"
 
 
 def skip_reason(match: Match, user: AuthUser, settings: UserSettings | None) -> str | None:
@@ -88,26 +188,34 @@ def record_alerts(session: Session, item: WatchItem, matches: list[Match], stats
     if user is None:
         return
     settings = session.get(UserSettings, user.id)
+    has_push = (
+        session.scalar(select(PushSubscription.id).where(PushSubscription.user_id == user.id))
+        is not None
+    )
     for match in matches:
         reason = skip_reason(match, user, settings)
         if reason:
             stats.skipped[reason] += 1
-        statement = (
-            insert(Alert)
-            .values(
-                user_id=user.id,
-                item_id=item.id,
-                recall_id=match.recall.id,
-                channel="email",
-                tier=(match.tier or Tier.CHECK_UNIT).value,
-                status="skipped" if reason else "pending",
-                details={"reason": reason} if reason else {},
+        channels = ["email", "push"] if has_push else ["email"]
+        for channel in channels:
+            # Push needs no verified email; every other rule is the same.
+            channel_reason = None if channel == "push" and reason == "unverified_email" else reason
+            statement = (
+                insert(Alert)
+                .values(
+                    user_id=user.id,
+                    item_id=item.id,
+                    recall_id=match.recall.id,
+                    channel=channel,
+                    tier=(match.tier or Tier.CHECK_UNIT).value,
+                    status="skipped" if channel_reason else "pending",
+                    details={"reason": channel_reason} if channel_reason else {},
+                )
+                .on_conflict_do_nothing(constraint="uq_alert_item_id_recall_id_channel")
+                .returning(Alert.id)
             )
-            .on_conflict_do_nothing(constraint="uq_alert_item_id_recall_id_channel")
-            .returning(Alert.id)
-        )
-        if session.scalar(statement) is not None and not reason:
-            stats.alerts_created += 1
+            if session.scalar(statement) is not None and not channel_reason:
+                stats.alerts_created += 1
 
 
 def recheck_all(
@@ -175,8 +283,8 @@ def compose(to: str, rows: list[tuple[Alert, WatchItem, Recall]], web_url: str) 
     footer = (
         f"{explain}See your list: {list_url}\n"
         f"Turn alerts off or change them: {settings_url}\n\n"
-        "You get these because you saved items to RecallRadar. Email alerts cover CPSC and NHTSA "
-        "recalls; FDA recalls appear on your list."
+        "You get these because you saved items to RecallRadar. Email alerts cover CPSC, NHTSA, and "
+        "USDA recalls; FDA recalls appear on your list."
     )
     text_parts.append(footer)
     html_parts.append(
@@ -191,7 +299,7 @@ def compose(to: str, rows: list[tuple[Alert, WatchItem, Recall]], web_url: str) 
         f"See your list</a> · <a href='{html.escape(settings_url, quote=True)}'>Change or "
         "turn off alerts</a></p>"
         "<p style='color:#555;font-size:13px'>You get these because you saved items to "
-        "RecallRadar. Email alerts cover CPSC and NHTSA recalls; FDA recalls appear on your "
+        "RecallRadar. Email alerts cover CPSC, NHTSA, and USDA recalls; FDA recalls appear on your "
         "list.</p>"
     )
     return Outgoing(
@@ -314,6 +422,7 @@ def run(
     mail_from: str,
     web_url: str,
     decode_vin: Decoder | None = None,
+    push_sender: PushSender | None = None,
 ) -> RunStats:
     stats = RunStats()
     started = time.perf_counter()
@@ -324,6 +433,8 @@ def run(
             outgoing = pending_emails(session, web_url)
         stats.emails_sent, stats.emails_failed = send_all(sessions, outgoing, sender, mail_from)
     else:
-        logger.warning("no SMTP_URL: alerts stay pending")
+        logger.warning("no SMTP_URL: email alerts stay pending")
+    if push_sender is not None:
+        stats.pushes_sent, stats.pushes_failed = send_pushes(sessions, push_sender, web_url)
     stats.seconds = round(time.perf_counter() - started, 1)
     return stats

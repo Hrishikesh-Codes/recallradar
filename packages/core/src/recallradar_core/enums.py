@@ -32,6 +32,14 @@ class NoticeType(StrEnum):
     ALERT = "alert"
 
 
+# How notices are named in reasons, emails, and on screen: never "recall" for a warning or alert.
+NOTICE_NAMES = {
+    NoticeType.RECALL: "recall",
+    NoticeType.WARNING: "warning",
+    NoticeType.ALERT: "public health alert",
+}
+
+
 class RemedyType(StrEnum):
     REFUND = "refund"
     REPAIR = "repair"

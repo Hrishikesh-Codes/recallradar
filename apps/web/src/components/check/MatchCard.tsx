@@ -21,6 +21,14 @@ const FEEDBACK: ReadonlyArray<{ label: FeedbackLabel; text: string }> = [
   { label: "handled", text: "Already handled" },
 ];
 
+// FDA safety warnings and USDA FSIS public health alerts are official notices, but not recalls:
+// FSIS issues an alert when product can't be recalled, often because it's no longer for sale.
+const NOTICE_KINDS: Record<MatchOut["recall"]["notice_type"], { name: string; chip?: string }> = {
+  recall: { name: "recall" },
+  warning: { name: "warning", chip: "Warning, not a recall" },
+  alert: { name: "public health alert", chip: "Public health alert, not a recall" },
+};
+
 function Section({ title, items }: { title: string; items: readonly string[] }) {
   const unique = [...new Set(items)];
   if (!unique.length) return null;
@@ -87,8 +95,8 @@ export function MatchCard({
   query: QueryOut;
 }) {
   const { recall, product } = match;
-  const kind = recall.notice_type === "warning" ? "warning" : "recall";
-  const reference = `${recall.source_label} ${kind} ${recall.reference ?? recall.source_recall_id}`;
+  const kind = NOTICE_KINDS[recall.notice_type];
+  const reference = `${recall.source_label} ${kind.name} ${recall.reference ?? recall.source_recall_id}`;
   const toCheck = [...match.what_to_check];
   if (match.tier === "check_unit") {
     for (const tip of product.where_to_look) if (!toCheck.includes(tip)) toCheck.push(tip);
@@ -99,15 +107,15 @@ export function MatchCard({
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {match.tier ? <StatusChip verdict={match.tier} /> : null}
-            {kind === "warning" ? (
-              <span className="chip text-muted-1">Warning, not a recall</span>
-            ) : null}
+            {kind.chip ? <span className="chip text-muted-1">{kind.chip}</span> : null}
           </div>
           <h3 className="text-heading font-medium text-balance">{recall.title}</h3>
           <p className="eyebrow text-muted-2">
             {reference}
             {recall.recall_date ? ` · ${formatDate(recall.recall_date)}` : ""}
-            {recall.classification ? ` · ${recall.classification}` : ""}
+            {recall.classification && recall.classification.toLowerCase() !== kind.name
+              ? ` · ${recall.classification}`
+              : ""}
           </p>
         </div>
         {recall.image_url ? (

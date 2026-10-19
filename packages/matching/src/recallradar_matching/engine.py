@@ -19,13 +19,14 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from enum import StrEnum
+from itertools import pairwise
 
 from sqlalchemy import String, func, literal, literal_column, or_, select, text
 from sqlalchemy.orm import Session
 
 from recallradar_core.categories import is_safety_critical, sources_for
 from recallradar_core.db import Recall, RecallProduct
-from recallradar_core.enums import SOURCE_LABELS, NoticeType, RecallSource
+from recallradar_core.enums import NOTICE_NAMES, SOURCE_LABELS, NoticeType, RecallSource
 from recallradar_identify.query import ProductQuery
 from recallradar_identify.text import model_tokens
 from recallradar_ingest.extract.text import code_key
@@ -35,6 +36,7 @@ from recallradar_matching.text import (
     GENERIC,
     brand_tokens,
     distinctive_tokens,
+    product_types,
     stems,
     title_product_phrase,
     tokens,
@@ -215,8 +217,41 @@ def _format_window(product: RecallProduct) -> str:
 
 
 def _source_label(recall: Recall) -> str:
-    kind = "warning" if recall.notice_type is NoticeType.WARNING else "recall"
+    kind = NOTICE_NAMES[recall.notice_type]
     return f"{SOURCE_LABELS[recall.source]} {kind} {recall.reference or recall.source_recall_id}"
+
+
+def _score_identifier(
+    match: Match, plausible: bool | None, window: str, restricted_detail: list[str]
+) -> None:
+    """Tier for a barcode, or a model number plus the brand: the strongest evidence."""
+    s, product, recall = match.signals, match.product, match.recall
+    if product.unit_restricted and not s.lot:
+        match.tier = Tier.CHECK_UNIT
+        match.reasons.append(
+            f"The {NOTICE_NAMES[recall.notice_type]} covers only some units of this product."
+        )
+        match.what_to_check = restricted_detail + list(product.where_to_look)
+    elif plausible is False:
+        match.tier = Tier.CHECK_UNIT
+        match.reasons.append(
+            f"You bought it before the recalled units went on sale ({window}); "
+            "check the label to be sure."
+        )
+        match.what_to_check = list(product.where_to_look) or restricted_detail
+    elif recall.notice_type is not NoticeType.RECALL:
+        # A warning or public health alert names the product exactly, but it isn't a recall,
+        # and "Recalled" must never say otherwise.
+        match.tier = Tier.CHECK_UNIT
+        match.reasons.append(
+            f"This is a {NOTICE_NAMES[recall.notice_type]}, not a recall: read what the "
+            "agency advises below."
+        )
+        match.what_to_check = restricted_detail + list(product.where_to_look)
+    else:
+        match.tier = Tier.RECALLED
+        if s.lot:
+            match.reasons.append("Your lot code is one of the recalled lots.")
 
 
 def _score(match: Match, query: ProductQuery, safety_critical: bool) -> None:
@@ -242,21 +277,7 @@ def _score(match: Match, query: ProductQuery, safety_critical: bool) -> None:
 
     restricted_detail = [r.get("detail", "") for r in product.restrictions if r.get("detail")]
     if identifier:
-        if product.unit_restricted and not s.lot:
-            match.tier = Tier.CHECK_UNIT
-            match.reasons.append("The recall covers only some units of this product.")
-            match.what_to_check = restricted_detail + list(product.where_to_look)
-        elif plausible is False:
-            match.tier = Tier.CHECK_UNIT
-            match.reasons.append(
-                f"You bought it before the recalled units went on sale ({window}); "
-                "check the label to be sure."
-            )
-            match.what_to_check = list(product.where_to_look) or restricted_detail
-        else:
-            match.tier = Tier.RECALLED
-            if s.lot:
-                match.reasons.append("Your lot code is one of the recalled lots.")
+        _score_identifier(match, plausible, window, restricted_detail)
         return
 
     family_threshold = FAMILY_SIMILARITY_SAFETY_CRITICAL if safety_critical else FAMILY_SIMILARITY
@@ -350,14 +371,19 @@ class _TokenFrequency:
 
 
 def _brand_match(
-    query_brand: set[str], product: RecallProduct, recall: Recall, frequency: _TokenFrequency
+    query_brand: set[str],
+    product: RecallProduct,
+    recall: Recall,
+    frequency: _TokenFrequency,
+    query_words: Sequence[str] = (),
 ) -> set[str]:
     """The query words that name the recalled product's brand or maker (empty if none)."""
     named = brand_tokens([product.brand, recall.firm, product.manufacturer])
     # CPSC product names usually start with the brand ("YOLAAH Portable Bed Rails"), which can
     # differ from the firm ("Guangzhou Aowei Technology"). Common first words ("Multi-Point")
     # aren't brands, so the word must be rare across all recalls.
-    first_word = set(tokens(product.product_name)[:1]) - GENERIC - named
+    lead = tokens(product.product_name)[:2]
+    first_word = set(lead[:1]) - GENERIC - named
     model_keys = set(product.model_keys)
     found: set[str] = set()
     for token in query_brand:
@@ -369,6 +395,12 @@ def _brand_match(
                 found.add(token)
         elif token in first_word and frequency(token) <= MAX_FIRST_WORD_FREQUENCY:
             found.add(token)
+    # Two-word brands ("Oscar Mayer Turkey Bacon"): the name's second word is part of the brand
+    # when the query has the same two words in order and the second is rare too.
+    if found & first_word and len(lead) == 2 and lead[1] in query_brand - GENERIC:
+        pairs = set(pairwise(query_words))
+        if tuple(lead) in pairs and frequency(lead[1]) <= MAX_FIRST_WORD_FREQUENCY:
+            found.add(lead[1])
     return found
 
 
@@ -380,6 +412,32 @@ def _query_is_specific(query: ProductQuery) -> bool:
     if query.upcs or query.model_numbers or query.brand:
         return True
     return len(distinctive_tokens(query.search_text())) >= 1
+
+
+def _line(
+    query: ProductQuery,
+    query_types: set[str],
+    brand_words: set[str],
+    product: RecallProduct,
+    recall: Recall,
+) -> str:
+    """Whether the query and the recalled product name the same product line."""
+    recall_brand = brand_tokens([product.brand, recall.firm, product.manufacturer])
+    # The recall title often names the product line when the product name doesn't
+    # ("IKEA Recalls 29 Million MALM ... Dressers" for "Children's ... dressers").
+    recall_text = f"{product.product_name} {title_product_phrase(recall.title)}"
+    recall_line = stems(distinctive_tokens(recall_text)) - stems(recall_brand)
+    query_line = _line_words(query, brand_words)
+    if query_line and recall_line:
+        return LINE_AGREES if query_line & recall_line else LINE_DIFFERS
+    # Same brand, different kind of product ("Oscar Mayer bacon" vs "Oscar Mayer ham and cheese
+    # loaf"): when no line words decide it, and both name product types that share none, the
+    # lines differ.
+    if query_types:
+        recall_types = product_types(recall_text, brand=recall_brand)
+        if recall_types and not query_types & recall_types:
+            return LINE_DIFFERS
+    return LINE_UNKNOWN
 
 
 def check(
@@ -415,22 +473,12 @@ def check(
     safety_critical_query = is_safety_critical(query.categories)
     frequency = _TokenFrequency(session)
 
+    query_types = product_types(query.search_text(), brand=query_brand)
+    query_words = tokens(query.search_text())
     candidates: list[Match] = []
     for product, recall in rows:
-        brand_words = _brand_match(query_brand, product, recall, frequency)
-        # The recall title often names the product line when the product name doesn't
-        # ("IKEA Recalls 29 Million MALM ... Dressers" for "Children's ... dressers").
-        recall_line = stems(
-            distinctive_tokens(f"{product.product_name} {title_product_phrase(recall.title)}")
-        ) - stems(brand_tokens([product.brand, recall.firm, product.manufacturer]))
-        query_line = _line_words(query, brand_words)
-        line = (
-            LINE_UNKNOWN
-            if not (query_line and recall_line)
-            else LINE_AGREES
-            if query_line & recall_line
-            else LINE_DIFFERS
-        )
+        brand_words = _brand_match(query_brand, product, recall, frequency, query_words)
+        line = _line(query, query_types, brand_words, product, recall)
         match = Match(
             product=product,
             recall=recall,

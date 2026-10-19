@@ -6,7 +6,12 @@ import unicodedata
 # openFDA text has "¿" wherever a non-ASCII character was lost upstream ("Jalapen¿o", "30¿").
 _LOST_CHAR = re.compile(r"(?<=[\w\d])¿|¿(?=[\w\d])")
 _SPACES = re.compile(r"\s+")
-_SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])")
+# A period after an abbreviation ("the U.S. Department", "EST. NO. 818") doesn't end a sentence.
+_SENTENCE_END = re.compile(
+    r"(?<!\bU\.S\.)(?<!\bEST\.)(?<!\bEst\.)(?<!\bNO\.)(?<!\bNo\.)(?<!\bNos\.)"
+    r"(?<!\bMr\.)(?<!\bMs\.)(?<!\bDr\.)(?<!\bSt\.)"
+    r"(?<=[.!?])\s+(?=[A-Z\"'(])"
+)
 
 
 def clean(text: str | None) -> str:

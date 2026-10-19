@@ -14,7 +14,8 @@ import pytest
 from recallradar_core.categories import Category
 from recallradar_core.enums import NoticeType, RecallSource, RecallStatus, RemedyType
 from recallradar_ingest.extract.restrictions import RestrictionKind
-from recallradar_ingest.sources import cpsc, nhtsa, openfda
+from recallradar_ingest.records import RecallRecord
+from recallradar_ingest.sources import cpsc, fsis, nhtsa, openfda
 
 FIXTURES = Path(__file__).parents[3] / "tests" / "fixtures"
 
@@ -343,3 +344,68 @@ class TestNhtsa:
         assert {c.fields["CAMPNO"] for batch in batches for c in batch} == {
             "24C002000", "24E056000", "24V533000",
         }  # fmt: skip
+
+
+class TestFsis:
+    @staticmethod
+    def records() -> dict[str, RecallRecord]:
+        raw = load("fsis/recalls_sample.json")
+        notices = fsis.english(raw, start=date(2014, 1, 1), end=date(2030, 1, 1))
+        return {r.source_recall_id: r for r in (fsis.parse(n) for n in notices)}
+
+    def test_spanish_copies_are_skipped(self) -> None:
+        raw = load("fsis/recalls_sample.json")
+        assert sum(r["langcode"] == "Spanish" for r in raw) == 1
+        assert len(self.records()) == len(raw) - 1
+
+    def test_recall_with_upc_lot_and_production_window(self) -> None:
+        recall = self.records()["025-2025"]
+        assert recall.source is RecallSource.FSIS
+        assert recall.notice_type is NoticeType.RECALL
+        assert recall.firm == "Kraft Heinz Foods Company"
+        assert recall.official_url and recall.official_url.startswith("https://www.fsis.usda.gov/")
+        bacon = recall.products[0]
+        assert bacon.product_name.startswith("Oscar Mayer Turkey BACON ORIGINAL | ")
+        assert bacon.upcs == ["00071871548601"]
+        assert bacon.lot_codes == ["RS40"]
+        assert Category.MEAT_POULTRY_EGG in bacon.categories
+        kinds = {r.kind for r in bacon.restrictions}
+        assert {RestrictionKind.LOT, RestrictionKind.DATE} <= kinds
+        assert recall.hazard and "Listeria" in recall.hazard
+        assert recall.remedy and "urged not to consume" in recall.remedy
+
+    def test_establishment_number_and_brand(self) -> None:
+        recall = self.records()["001-2019"]
+        sausage = recall.products[0]
+        assert sausage.brand == "Daisyfield"
+        assert sausage.weak_codes == ["818"]
+        assert "EST" not in sausage.weak_codes
+        assert any("818" in tip for tip in sausage.where_to_look)
+        assert recall.status is RecallStatus.COMPLETED
+
+    def test_public_health_alert_is_not_a_recall(self) -> None:
+        alert = self.records()["PHA-10062026-01"]
+        assert alert.notice_type is NoticeType.ALERT
+        assert alert.classification == "Public Health Alert"
+        # The hazard says what's wrong, not "no confirmed reports of illness ... due to ...".
+        assert alert.hazard and "illegally imported from Jamaica" in alert.hazard
+        assert alert.products[0].weak_codes == ["G-01"]
+        # "regardless of the product date": every unit is covered.
+        assert not alert.products[0].unit_restricted
+
+    def test_contacts_are_not_stored(self) -> None:
+        for recall in self.records().values():
+            text = " ".join(filter(None, [recall.description, recall.hazard, recall.remedy]))
+            assert "@" not in text
+            assert "555" not in text
+
+    def test_full_list_in_a_pdf_still_gives_one_product(self) -> None:
+        recall = self.records()["030-2024-EXP"]
+        (product,) = recall.products
+        assert product.product_name == recall.title
+        assert set(recall.raw["establishments"]) >= {"P-46684", "M46684"}
+
+    def test_fetch_reports_the_block(self) -> None:
+        client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(403)))
+        with pytest.raises(fsis.BlockedError, match="--file"):
+            fsis.fetch(client)

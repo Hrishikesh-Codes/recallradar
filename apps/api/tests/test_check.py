@@ -89,7 +89,7 @@ def test_text_check_returns_verdict_reasons_and_coverage(client: TestClient) -> 
     assert any("WL33006DMN" in reason for reason in match["reasons"])
     assert body["query"]["model_numbers"] == ["WL33006DMN"]
     coverage = body["coverage"]
-    assert {s["label"] for s in coverage["checked"]} == {"CPSC", "FDA", "NHTSA"}
+    assert {s["label"] for s in coverage["checked"]} == {"CPSC", "FDA", "NHTSA", "USDA FSIS"}
     assert coverage["recalls_checked"] == sum(s["recalls"] for s in coverage["checked"])
 
 

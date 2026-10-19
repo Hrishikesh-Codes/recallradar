@@ -25,6 +25,7 @@ INGESTED = [
     RecallSource.FDA_DRUG,
     RecallSource.FDA_DEVICE,
     RecallSource.NHTSA,
+    RecallSource.FSIS,
 ]
 
 
@@ -39,9 +40,9 @@ def sessions(loaded_database_url: str) -> Iterator[sessionmaker[Session]]:
 def run(
     sessions: sessionmaker[Session], embedder: Embedder
 ) -> Callable[[ProductQuery], CheckResult]:
-    def go(query: ProductQuery) -> CheckResult:
+    def go(query: ProductQuery, ingested: list[RecallSource] = INGESTED) -> CheckResult:
         with sessions() as session:
-            return check(session, query, embedding=embed_query(embedder, query), ingested=INGESTED)
+            return check(session, query, embedding=embed_query(embedder, query), ingested=ingested)
 
     return go
 
@@ -129,10 +130,30 @@ def test_child_seat_matches_by_brand_and_line(run: Callable[..., CheckResult]) -
     assert recall_ids(result) == ["24C002000"]
 
 
-def test_meat_is_not_covered(run: Callable[..., CheckResult]) -> None:
-    result = run(parse_text("Oscar Mayer bacon"))
+def test_meat_is_not_covered_without_fsis(run: Callable[..., CheckResult]) -> None:
+    without_fsis = [s for s in INGESTED if s is not RecallSource.FSIS]
+    result = run(parse_text("Oscar Mayer bacon"), without_fsis)
     assert result.verdict is Tier.NOT_COVERED
     assert RecallSource.FSIS in result.uncovered_sources
+
+
+def test_meat_matches_by_two_word_brand_and_product_type(run: Callable[..., CheckResult]) -> None:
+    # FSIS 025-2025 names "Oscar Mayer Turkey BACON ORIGINAL"; the firm is Kraft Heinz.
+    result = run(parse_text("Oscar Mayer turkey bacon"))
+    assert result.verdict is Tier.CHECK_UNIT
+    assert recall_ids(result) == ["025-2025"]
+    assert result.matches[0].brand_words == {"oscar", "mayer"}
+
+
+def test_meat_barcode_with_lot_codes_is_check_your_unit(run: Callable[..., CheckResult]) -> None:
+    result = run(parse_barcode("071871548601"))  # FSIS 025-2025 lists lots for this UPC
+    assert result.verdict is Tier.CHECK_UNIT
+    assert recall_ids(result) == ["025-2025"]
+
+
+def test_same_brand_other_product_type_is_not_a_match(run: Callable[..., CheckResult]) -> None:
+    result = run(parse_text("Oscar Mayer hot dogs"))
+    assert "025-2025" not in recall_ids(result)
 
 
 def test_vague_input_is_unidentified(run: Callable[..., CheckResult]) -> None:

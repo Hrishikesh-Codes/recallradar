@@ -34,7 +34,7 @@ from recallradar_core.db import (
     UserSettings,
     WatchItem,
 )
-from recallradar_core.enums import SOURCE_LABELS, NoticeType, RecallSource
+from recallradar_core.enums import NOTICE_NAMES, SOURCE_LABELS, NoticeType, RecallSource
 from recallradar_identify.vin import Decoder
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import Match, Tier
@@ -133,10 +133,11 @@ def send_pushes(
             ).all()
             labels = list(dict.fromkeys(" ".join(item.label.split()) for _, item, _ in rows))
             first_recall = rows[0][2]
+            noun = _noun(recall for _, _, recall in rows)
             payload = {
-                "title": f"Recall: {labels[0]}"
+                "title": f"{noun.capitalize()}: {labels[0]}"
                 if len(labels) == 1
-                else f"Recalls match {len(labels)} items on your list",
+                else f"{noun.capitalize()}s match {len(labels)} items on your list",
                 "body": truncate_text(first_recall.title, 160),
                 "url": f"{web_url.rstrip('/')}/list",
                 "tag": f"recalls-{user_id}",
@@ -241,29 +242,35 @@ def recheck_all(
                 record_alerts(session, item, result.new_matches, stats)
 
 
+def _noun(recalls: Iterable[Recall]) -> str:
+    """What to call these notices: warnings and public health alerts aren't recalls."""
+    kinds = {recall.notice_type for recall in recalls}
+    return "recall" if kinds <= {NoticeType.RECALL} else "safety notice"
+
+
 def compose(to: str, rows: list[tuple[Alert, WatchItem, Recall]], web_url: str) -> Outgoing:
     # Labels are user text: one line each, so they can't break the subject header.
     labels = list(dict.fromkeys(" ".join(item.label.split()) for _, item, _ in rows))
+    noun = _noun(recall for _, _, recall in rows)
     if len(labels) == 1:
-        subject = f"A recall matches “{labels[0]}” on your list"
+        subject = f"A {noun} matches “{labels[0]}” on your list"
     else:
-        subject = f"Recalls match {len(labels)} items on your list"
+        subject = f"{noun.capitalize()}s match {len(labels)} items on your list"
     list_url = f"{web_url.rstrip('/')}/list"
     settings_url = f"{web_url.rstrip('/')}/account"
-    text_parts = ["Hello,", "", "We found a recall that may affect something on your list.", ""]
-    html_parts = [
-        "<p>Hello,</p><p>We found a recall that may affect something on your list.</p>",
-    ]
+    intro = f"We found a {noun} that may affect something on your list."
+    text_parts = ["Hello,", "", intro, ""]
+    html_parts = [f"<p>Hello,</p><p>{intro}</p>"]
     for alert, item, recall in rows:
         verdict = TIER_WORDS.get(alert.tier, "Check your unit")
-        kind = "warning" if recall.notice_type is NoticeType.WARNING else "recall"
+        kind = NOTICE_NAMES[recall.notice_type]
         reference = (
             f"{SOURCE_LABELS[recall.source]} {kind} {recall.reference or recall.source_recall_id}"
         )
         lines = [
             f"Your item: {item.label}",
             f"Verdict: {verdict}",
-            f"Recall: {recall.title} ({reference})",
+            f"{kind.capitalize()}: {recall.title} ({reference})",
         ]
         if recall.hazard:
             lines.append(f"Hazard: {recall.hazard}")

@@ -48,6 +48,12 @@ function ReadAs({ query }: { query: QueryOut }) {
   );
 }
 
+/** "The recall", or "2 notices" when a match is a warning or public health alert. */
+function matchesHeading(matches: CheckResponse["matches"]): string {
+  const noun = matches.every((m) => m.recall.notice_type === "recall") ? "recall" : "notice";
+  return matches.length === 1 ? `The ${noun}` : `${matches.length} ${noun}s`;
+}
+
 export function VerdictView({
   result,
   input,
@@ -89,7 +95,7 @@ export function VerdictView({
       {result.matches.length ? (
         <section aria-labelledby="matches-heading" className="flex flex-col gap-4">
           <h2 id="matches-heading" className="eyebrow text-muted-2">
-            {result.matches.length === 1 ? "The recall" : `${result.matches.length} recalls`}
+            {matchesHeading(result.matches)}
           </h2>
           {result.matches.map((match) => (
             <MatchCard

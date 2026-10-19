@@ -38,6 +38,7 @@ INGESTED = [
     RecallSource.FDA_DRUG,
     RecallSource.FDA_DEVICE,
     RecallSource.NHTSA,
+    RecallSource.FSIS,
 ]
 _POSITIVE = {Tier.RECALLED, Tier.CHECK_UNIT}
 

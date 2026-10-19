@@ -46,6 +46,10 @@ _PRODUCT_WORDS = frozenset(
     """.split()
 )
 GENERIC = _STOP | _PRODUCT_WORDS
+# Containers, not kinds of product: "washing machine" and "washer" are the same thing.
+_NOT_TYPES = frozenset(
+    "machine machines device devices item items product products unit units".split()
+)
 
 
 def tokens(text: str | None) -> list[str]:
@@ -105,3 +109,29 @@ def title_product_phrase(title: str) -> str:
     if not phrase.strip(" ,:"):  # "X Recalled Due to ...": the product comes first
         phrase = title[: verb.start()]
     return " ".join(w for w in phrase.split() if w.lower() not in _TITLE_STOP)
+
+
+def type_stem(word: str) -> str:
+    """Fold a product word to a stem shared by its forms: washer/washers/washing -> wash."""
+    base = stem(word)
+    for suffix in ("ing", "er"):
+        if base.endswith(suffix) and len(base) - len(suffix) >= 3:
+            return base[: -len(suffix)]
+    return base
+
+
+_TYPE_WORDS = frozenset(w for w in _PRODUCT_WORDS - _NOT_TYPES - _STOP if len(w) >= 3)
+_TYPE_STEMS = frozenset(type_stem(w) for w in _TYPE_WORDS)
+
+
+def product_types(text: str, *, brand: Iterable[str] = ()) -> set[str]:
+    """Kinds of product a text names, as stems: "Top-Load Washing Machines" -> {"wash"}.
+
+    Brand words don't count ("Fisher-Price" isn't fish).
+    """
+    skip = set(brand) | _STOP
+    return {
+        t
+        for t in (type_stem(w) for w in tokens(text) if w not in skip and len(w) >= 3)
+        if t in _TYPE_STEMS
+    }

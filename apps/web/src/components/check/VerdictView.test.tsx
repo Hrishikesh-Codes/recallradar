@@ -105,6 +105,26 @@ describe("VerdictView", () => {
     expect(screen.getByText(/NHTSA \(vehicles, car seats, tires\)/)).toBeInTheDocument();
   });
 
+  it("says when a notice is a public health alert, not a recall", () => {
+    const alert: MatchOut = {
+      ...match,
+      recall: {
+        ...match.recall,
+        source: "fsis",
+        source_label: "USDA FSIS",
+        reference: "PHA-10062026-01",
+        notice_type: "alert",
+      },
+    };
+    render(<VerdictView result={{ ...result, matches: [alert] }} onCheckAnother={() => {}} />);
+    expect(screen.getByRole("heading", { name: "The notice" })).toBeInTheDocument();
+    const card = screen.getByRole("article");
+    expect(within(card).getByText("Public health alert, not a recall")).toBeInTheDocument();
+    expect(
+      within(card).getByText(/USDA FSIS public health alert PHA-10062026-01/),
+    ).toBeInTheDocument();
+  });
+
   it("offers feedback on each match", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}", { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);

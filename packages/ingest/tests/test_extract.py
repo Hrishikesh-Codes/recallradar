@@ -7,7 +7,7 @@ import pytest
 from recallradar_ingest.extract import codes, dates, gtin, labelers, restrictions
 from recallradar_ingest.extract.codes import CodeKind, DateKind
 from recallradar_ingest.extract.restrictions import RestrictionKind
-from recallradar_ingest.extract.text import clean, code_key
+from recallradar_ingest.extract.text import clean, code_key, sentences
 
 
 class TestText:
@@ -295,3 +295,16 @@ class TestLabelers:
     )
     def test_labelers(self, text: str, expected: list[str]) -> None:
         assert labelers.labelers(text) == expected
+
+
+class TestSentences:
+    def test_abbreviations_do_not_end_sentences(self) -> None:
+        text = (
+            "The U.S. Department of Agriculture is issuing an alert. The products bear "
+            "establishment number EST. NO. G-01 inside the mark. Dr. Smith said so."
+        )
+        assert sentences(text) == [
+            "The U.S. Department of Agriculture is issuing an alert.",
+            "The products bear establishment number EST. NO. G-01 inside the mark.",
+            "Dr. Smith said so.",
+        ]

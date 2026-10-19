@@ -67,11 +67,16 @@ class Outbox:
         self.sent.append(message)
 
 
-def go(sessions: sessionmaker[Session], embedder: Embedder, outbox: Outbox) -> dict[str, object]:
+def go(
+    sessions: sessionmaker[Session],
+    embedder: Embedder,
+    outbox: Outbox,
+    ingested: list[RecallSource] = INGESTED,
+) -> dict[str, object]:
     stats = run(
         sessions,
         embedder,
-        ingested=INGESTED,
+        ingested=ingested,
         sender=outbox,
         mail_from="RecallRadar <alerts@example.com>",
         web_url="https://recallradar.example",
@@ -103,6 +108,23 @@ def test_new_cpsc_match_is_emailed_once(
     with sessions() as session:
         (alert,) = session.scalars(select(Alert)).all()
     assert alert.status == "sent" and alert.provider_message_id
+
+
+def test_public_health_alert_is_not_called_a_recall(
+    sessions: sessionmaker[Session], embedder: Embedder
+) -> None:
+    with sessions.begin() as session:
+        user(session, "u1")
+        watch(session, "u1", "Grace chicken vienna sausages")
+    outbox = Outbox()
+    assert go(sessions, embedder, outbox, [*INGESTED, RecallSource.FSIS])["sent"] == 1
+    (message,) = outbox.sent
+    assert message["Subject"].startswith("A safety notice matches")
+    body = message.get_body(("plain",))
+    assert body is not None
+    text = body.get_content()
+    assert "USDA FSIS public health alert PHA-10062026-01" in text
+    assert "recall" not in text.split("Public health alert:")[0].lower()
 
 
 def test_who_gets_no_email(sessions: sessionmaker[Session], embedder: Embedder) -> None:

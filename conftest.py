@@ -23,7 +23,7 @@ from recallradar_core.db.migrate import upgrade_to_head
 from recallradar_core.enums import RecallSource
 from recallradar_core.settings import LOCAL_DATABASE_URL, Settings
 from recallradar_ingest import store
-from recallradar_ingest.sources import cpsc, nhtsa, openfda
+from recallradar_ingest.sources import cpsc, fsis, nhtsa, openfda
 from recallradar_matching.embed import Embedder, embed_missing
 
 
@@ -74,7 +74,7 @@ def embedder() -> Embedder:
 
 
 def load_fixture_recalls(url: str, embedder: Embedder) -> None:
-    """Migrate `url` and fill it with every real CPSC/openFDA fixture record, embedded."""
+    """Migrate `url` and fill it with every real fixture recall (all sources), embedded."""
     upgrade_to_head(url)
     engine = create_engine(url)
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
@@ -88,6 +88,10 @@ def load_fixture_recalls(url: str, embedder: Embedder) -> None:
     rows = (FIXTURES / "nhtsa" / "flat_rcl_sample.txt").read_text(encoding="utf-8").splitlines()
     campaigns = nhtsa.read(iter(rows), start=date(2010, 1, 1), end=date(2030, 1, 1))
     records += [nhtsa.parse(campaign) for campaign in campaigns.values()]
+    notices = fsis.english(
+        load_fixture("fsis/recalls_sample.json"), start=date(2014, 1, 1), end=date(2030, 1, 1)
+    )
+    records += [fsis.parse(notice) for notice in notices]
     with sessions.begin() as session:
         store.upsert(session, records)
     embed_missing(sessions, embedder, batch_size=64)

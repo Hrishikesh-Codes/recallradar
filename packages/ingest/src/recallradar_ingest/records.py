@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import date, datetime
 from typing import Any
 
@@ -95,7 +95,10 @@ class RecallRecord:
     products: list[ProductRecord] = field(default_factory=list)
 
     def hash(self) -> str:
-        return content_hash(self.raw)
+        # The parsed fields as well as the source's: a parser fix (a better hazard sentence)
+        # reaches stored rows the next time they're fetched. Products have their own hashes.
+        payload = {f.name: getattr(self, f.name) for f in fields(self) if f.name != "products"}
+        return content_hash(payload)
 
 
 def _keys(values: list[str]) -> list[str]:

@@ -69,6 +69,18 @@ def test_upsert_is_idempotent_and_detects_changes(sessions: sessionmaker[Session
     cleared = [name for name, embedding in embeddings if embedding is None]
     assert len(cleared) == 1 and cleared[0].endswith("(corrected)")
 
+    # A parser fix with the same source data still updates the stored recall.
+    reparsed = cpsc.parse(load("cpsc/recalls_by_id.json")[2])
+    reparsed.hazard = "A better hazard sentence."
+    with sessions.begin() as session:
+        result = store.upsert(session, [reparsed])
+    assert result.recalls_updated == 1
+    with sessions() as session:
+        hazard = session.scalar(
+            select(Recall.hazard).where(Recall.source_recall_id == reparsed.source_recall_id)
+        )
+    assert hazard == "A better hazard sentence."
+
 
 def test_stored_products_keep_keys_and_restrictions(sessions: sessionmaker[Session]) -> None:
     records = openfda.parse_events(

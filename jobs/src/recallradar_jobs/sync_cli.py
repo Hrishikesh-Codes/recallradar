@@ -1,6 +1,7 @@
 """`recallradar-sync`: fetch recalls from the sources into the database.
 
-uv run recallradar-sync --mode backfill                 # since 2015 (NHTSA: 2010)
+uv run recallradar-sync --mode backfill                 # since 2015 (NHTSA: 2010), not FSIS
+uv run recallradar-sync --source fsis --mode backfill --file ~/Downloads/fsis.json
 uv run recallradar-sync --source cpsc                   # incremental, one source
 uv run recallradar-sync --source fda_device --since 2020-01-01 --mode backfill
 """
@@ -11,6 +12,7 @@ import logging
 import sys
 from dataclasses import asdict
 from datetime import date
+from pathlib import Path
 
 from recallradar_core.db.session import get_sessionmaker
 from recallradar_core.enums import RecallSource, SyncMode
@@ -36,11 +38,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--since", type=date.fromisoformat, help="window start (YYYY-MM-DD)")
     parser.add_argument("--until", type=date.fromisoformat, help="window end (default: today)")
+    parser.add_argument(
+        "--file",
+        type=Path,
+        help="FSIS only: import a copy of the Recall API response saved from a browser",
+    )
     args = parser.parse_args(argv)
+    if args.file and args.source != RecallSource.FSIS.value:
+        parser.error("--file works with --source fsis only")
 
     settings = get_settings()
     configure_logging(settings.log_level)
-    sources = sync.SUPPORTED if args.source == "all" else (RecallSource(args.source),)
+    sources = sync.AUTOMATED if args.source == "all" else (RecallSource(args.source),)
     failed = []
     with make_client() as client:
         for source in sources:
@@ -53,6 +62,7 @@ def main(argv: list[str] | None = None) -> int:
                     since=args.since,
                     until=args.until,
                     openfda_api_key=settings.openfda_api_key,
+                    file=args.file,
                 )
             except Exception:
                 failed.append(source.value)  # already logged and recorded in sync_run

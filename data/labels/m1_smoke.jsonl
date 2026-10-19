@@ -46,7 +46,7 @@
 {"id": "neg-dr-bronners", "type": "text", "input": "Dr. Bronner's castile soap", "verdict": "all_clear", "recalls": [], "why": "No recall names this brand."}
 {"id": "nhtsa-2019-civic", "type": "text", "input": "2019 Honda Civic", "verdict": "check_unit", "recalls": ["nhtsa:20V314000", "nhtsa:21V215000", "nhtsa:23V858000", "nhtsa:26V332000"], "why": "NHTSA lists the 2019 Civic in these campaigns; recalls cover certain VINs, so check your unit."}
 {"id": "nhtsa-graco-4ever", "type": "text", "input": "Graco 4Ever car seat", "verdict": "all_clear", "recalls": [], "why": "Hard negative: Graco's other car seats are recalled (SnugRide, Extend2Fit...), not the 4Ever."}
-{"id": "cov-bacon", "type": "text", "input": "Oscar Mayer bacon", "verdict": "not_covered", "recalls": [], "why": "Meat is USDA FSIS's."}
+{"id": "fsis-oscar-mayer-bacon", "type": "text", "input": "Oscar Mayer bacon", "verdict": "check_unit", "recalls": ["fsis:025-2025", "fsis:070-2019"], "why": "Oscar Mayer bacon recalls exist (turkey bacon 2025, cooked bacon 2019); Lunchables aren't bacon.", "not_recalls": ["fda_food:83178"]}
 {"id": "nhtsa-michelin-tires", "type": "text", "input": "Michelin tires", "verdict": "check_unit", "recalls": ["nhtsa:12T009000", "nhtsa:13T006000", "nhtsa:13T012000", "nhtsa:15T020000", "nhtsa:16T012000", "nhtsa:19T025000", "nhtsa:22T005000", "nhtsa:22T023000", "nhtsa:23T002000", "nhtsa:24T012000", "nhtsa:25T008000", "nhtsa:25T012000"], "why": "Brand only: Michelin tire recalls exist; the DOT code decides."}
 {"id": "vague-blender", "type": "text", "input": "blender", "verdict": "unidentified", "recalls": [], "why": "Too vague to check."}
 {"id": "vague-chair", "type": "text", "input": "chair", "verdict": "unidentified", "recalls": [], "why": "Too vague to check."}
@@ -55,3 +55,6 @@
 {"id": "nhtsa-nuna-rava", "type": "text", "input": "Nuna Rava car seat", "verdict": "check_unit", "recalls": ["nhtsa:24C002000"], "why": "Child seat recall restricted by manufacture date."}
 {"id": "nhtsa-unknown-model", "type": "text", "input": "2019 Honda Flibbertigibbet", "verdict": "unidentified", "recalls": [], "why": "A known make with a model NHTSA has never recalled: don't say all clear."}
 {"id": "cpsc-honda-generator", "type": "text", "input": "Honda generator EU2200i", "verdict": "check_unit", "recalls": ["cpsc:8513"], "why": "A car maker's non-vehicle product: must not be swallowed by vehicle matching or brand-frequency."}
+{"id": "fsis-turkey-bacon-upc", "type": "barcode", "input": "071871548601", "verdict": "check_unit", "recalls": ["fsis:025-2025"], "why": "The barcode is listed, but only certain lots and use-by dates are recalled."}
+{"id": "fsis-daisyfield-sausage", "type": "text", "input": "Daisyfield pork sausage", "verdict": "check_unit", "recalls": ["fsis:001-2019"], "why": "Brand and product match; production dates decide."}
+{"id": "fsis-hormel-bacon-negative", "type": "text", "input": "Hormel Black Label bacon", "verdict": "all_clear", "recalls": [], "why": "Hard negative: Hormel's FSIS recalls are chicken, stew, ham, and canned meat, not bacon."}

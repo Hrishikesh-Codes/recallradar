@@ -6,18 +6,19 @@ notices (CPSC, FDA, USDA FSIS, NHTSA). RecallRadar then keeps watching your list
 if a recall is announced later.
 
 > **Status: Milestone 1 built (deployment pending); Milestone 2 in progress.** Checks against
-> 41,165 recalls from CPSC and FDA (since 2015) and NHTSA (vehicles, car seats, tires, since 2010)
-> work end to end locally: type, paste a link, scan a barcode, or enter a VIN, and get a verdict
-> with its evidence; save items to a list; get an email when a CPSC or NHTSA recall matches one
-> later. USDA FSIS (meat, poultry, eggs) is next. Numbers below are measured; how is in
-> [docs/DECISIONS.md](docs/DECISIONS.md).
+> 42,304 recalls from CPSC, FDA and USDA FSIS (since 2015) and NHTSA (vehicles, car seats, tires,
+> since 2010) work end to end locally: type, paste a link, scan a barcode, photograph a label, or
+> enter a VIN, and get a verdict with its evidence; save items to a list; get an email or push
+> notification when a CPSC, NHTSA or FSIS recall matches one later. FSIS blocks automated
+> downloads, so meat recalls are imported from a browser-saved copy for now. Numbers below are
+> measured; how is in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## How a check works
 
 1. **Read the input.** Typed text is parsed for brand, model numbers, barcodes, lot codes and a
    purchase date. Links are read from the URL text only; we never open store pages or ask for
    store passwords. Barcodes are validated, and for food we look up the name on Open Food Facts.
-2. **Find candidates** among 75,176 recalled products with four retrievers merged by
+2. **Find candidates** among 117,247 recalled products with four retrievers merged by
    reciprocal-rank fusion: exact identifiers, full-text search, trigram similarity, and embeddings
    (`bge-small-en-v1.5`, HNSW on `halfvec`).
 3. **Decide the tier with plain rules that never overclaim.** *Recalled* only for a barcode, or a
@@ -32,11 +33,11 @@ if a recall is announced later.
 
 | What | Result |
 |---|---|
-| Recalls indexed | 41,165: CPSC 3,710 · FDA food 6,353 · drugs 3,824 · devices 11,969 (since 2015) · NHTSA 15,309 (since 2010) |
-| Database size, everything embedded | 500 MB (Neon's free plan: 1 GB) |
+| Recalls indexed | 42,304: CPSC 3,710 · FDA food 6,353 · drugs 3,824 · devices 11,969 · USDA FSIS 1,139 (since 2015) · NHTSA 15,309 (since 2010) |
+| Database size, everything embedded | 517 MB (Neon's free plan: 1 GB) |
 | Vector search vs exact search | recall@50 0.988 at 1.9 ms median (80 queries) |
-| Check latency (local, M-series Mac) | 46 ms median over the 57-case smoke set |
-| Smoke set | 57/57 after tuning on it: a regression check, **not** an accuracy estimate (M3) |
+| Check latency (local, M-series Mac) | 39 ms median over the 60-case smoke set |
+| Smoke set | 60/60 after tuning on it: a regression check, **not** an accuracy estimate (M3) |
 
 ## What's here
 

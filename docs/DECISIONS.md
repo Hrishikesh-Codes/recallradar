@@ -37,6 +37,50 @@ why, and what it costs.
 - **NHTSA recalls are emailed too.** The CPSC-only rule came from openFDA's terms; NHTSA's data has
   no such restriction.
 
+### USDA FSIS: meat, poultry, and eggs
+
+- **Source: FSIS's Recall API** (`/fsis/api/recall/v/1`): one JSON array of every notice since
+  2014, 13 MB, English and Spanish copies as separate records (2,030 on 2026-10-15). We keep the
+  English ones from 2015, like CPSC: 1,139 notices, 1,878 products, 168 of them public health
+  alerts.
+- **FSIS's CDN refuses scripted clients** (HTTP 403 from this project's network and from GitHub's
+  runners) while browsers get the data. We don't disguise requests to get past it. The sync
+  reports the refusal, and `recallradar-sync --source fsis --file <path>` imports a copy saved
+  from a browser. FSIS is left out of `--source all`, so the daily job doesn't fail on it. Cost:
+  meat recalls are as fresh as the last manual import. Next step: ask FSIS to allow the API for
+  automated clients.
+- **Public health alerts are stored as alerts, not recalls** (notice type `alert`). FSIS issues
+  one when product can't be recalled, often because it's no longer for sale. The card says
+  "Public health alert, not a recall", and reasons, emails and push titles name it as an alert
+  ("safety notice" when one message mixes kinds).
+- **A warning or alert is never *Recalled*.** An exact barcode match on a CPSC warning or FSIS
+  alert is *Check your unit*, with a reason that says what the notice is. Before this, an
+  unrestricted warning matched by barcode would have said *Recalled*.
+- **The establishment number is the identifier a shopper can find:** it's printed inside the USDA
+  mark of inspection ("EST. 818", "P-46684"). 881 notices name one. It's stored as a weak code:
+  it identifies a plant, not a product, so it never makes a verdict *Recalled* by itself, and
+  the evidence tells people where to look for it. UPCs are rare (29 products).
+- **Dates and lots restrict the recall** unless the notice says it applies "regardless of the
+  product date". Restricted notices are *Check your unit*.
+- **Company and media contact sentences (names, phones, emails) are never stored.** The fixture's
+  contacts are replaced with fictional ones.
+- **The hazard is the first sentence naming one,** skipping "no confirmed reports of illness ...
+  due to consumption". When none does, it's the announcement ("is issuing a public health alert
+  for ... illegally imported from Jamaica"). The sentence splitter no longer breaks after "U.S."
+  or "EST. NO.", which also helps CPSC restriction sentences.
+- **A recall's content hash now covers the parsed fields, not only the source's.** Before, a
+  parser fix never reached stored rows whose source data hadn't changed. Re-importing FSIS
+  updated all 1,139 notices once. Other sources update as their records are fetched again.
+- **Two-word brands and product types.** Meat notices name the brand at the start of the product
+  ("Oscar Mayer Turkey BACON") while the firm is someone else (Kraft Heinz). A name's second word
+  now counts as brand when the query has the same two words in order and it's rare. When no
+  product-line words decide a match, product types that share nothing ("bacon" vs "ham and cheese
+  loaf") make the lines differ. Word forms fold together ("washer", "washing machines"), and
+  brand and connector words aren't types. An earlier version that let types override agreeing
+  line words caused a dangerous miss (a Samsung washer, CPSC 9486), so it doesn't. Smoke set:
+  60/60 with 4 meat cases (still a tuning set).
+- **FSIS recalls are emailed too;** like NHTSA's, the data has no restriction on alerts.
+
 ### Label photos
 
 - **OCR runs in the browser (Tesseract.js 7), so photos never leave the device;** only the text

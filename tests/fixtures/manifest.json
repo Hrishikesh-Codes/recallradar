@@ -88,5 +88,11 @@
   "url": "https://api.nhtsa.gov/recalls/campaignNumber?campaignNumber=24C002000",
   "fetched_at": "2026-10-15T22:46:16.121102+00:00",
   "note": "recalls API, for comparison with the flat file"
+ },
+ {
+  "file": "fsis/recalls_sample.json",
+  "url": "https://www.fsis.usda.gov/fsis/api/recall/v/1",
+  "fetched_at": "2026-10-15T23:25:57.478225+00:00",
+  "note": "saved from a browser (FSIS refuses scripted clients); records 025-2026 (English), 001-2019 (English), PHA-10062026-01 (English), 030-2024-EXP (English), 009-2025 (English), 009-2025 (Spanish), 025-2025 (English); company and media contact fields removed; emails and phone numbers in the summaries replaced with contact@example.com and (555) 010-0000 (USDA's hotline address kept)"
  }
 ]

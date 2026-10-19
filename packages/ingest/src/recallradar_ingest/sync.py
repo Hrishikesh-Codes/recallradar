@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -14,7 +15,7 @@ from recallradar_core.db import SyncRun
 from recallradar_core.enums import RecallSource, SyncMode, SyncStatus
 from recallradar_ingest import store
 from recallradar_ingest.records import RecallRecord
-from recallradar_ingest.sources import cpsc, nhtsa, openfda
+from recallradar_ingest.sources import cpsc, fsis, nhtsa, openfda
 
 logger = logging.getLogger("recallradar.ingest.sync")
 
@@ -30,7 +31,11 @@ INCREMENTAL_OVERLAP = {
     RecallSource.FDA_DRUG: timedelta(days=35),
     RecallSource.FDA_DEVICE: timedelta(days=35),
     RecallSource.NHTSA: timedelta(days=60),
+    RecallSource.FSIS: timedelta(days=60),
 }
+# FSIS refuses automated requests (see sources/fsis.py), so `--source all` skips it; it's
+# imported from a file saved in a browser until FSIS grants access.
+AUTOMATED = tuple(source for source in INCREMENTAL_OVERLAP if source is not RecallSource.FSIS)
 FDA_SOURCES = frozenset({RecallSource.FDA_FOOD, RecallSource.FDA_DRUG, RecallSource.FDA_DEVICE})
 SUPPORTED = tuple(INCREMENTAL_OVERLAP)
 BATCH = 200
@@ -92,6 +97,7 @@ def _pages(
     start: date,
     end: date,
     openfda_api_key: str | None,
+    file: Path | None = None,
 ) -> Iterator[list[RecallRecord]]:
     if source is RecallSource.CPSC:
         for raw in cpsc.fetch(
@@ -101,6 +107,11 @@ def _pages(
     elif source is RecallSource.NHTSA:
         for campaigns in nhtsa.fetch(client, start=start, end=end):
             yield [nhtsa.parse(campaign) for campaign in campaigns]
+    elif source is RecallSource.FSIS:
+        raw = fsis.load_file(file) if file else fsis.fetch(client)
+        notices = list(fsis.english(raw, start=start, end=end))
+        for offset in range(0, len(notices), BATCH):
+            yield [fsis.parse(record) for record in notices[offset : offset + BATCH]]
     else:
         for raw in openfda.fetch(client, source, start=start, end=end, api_key=openfda_api_key):
             yield openfda.parse_events(source, raw)
@@ -115,6 +126,7 @@ def run(
     since: date | None = None,
     until: date | None = None,
     openfda_api_key: str | None = None,
+    file: Path | None = None,
 ) -> SyncResult:
     with session_factory() as session:
         start = _window(session, source, mode, since)
@@ -130,7 +142,13 @@ def run(
     )
     try:
         pages = _pages(
-            client, source, mode=mode, start=start, end=end, openfda_api_key=openfda_api_key
+            client,
+            source,
+            mode=mode,
+            start=start,
+            end=end,
+            openfda_api_key=openfda_api_key,
+            file=file,
         )
         for records in pages:
             result.fetched += sum(len(r.products) for r in records)

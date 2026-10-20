@@ -12,12 +12,13 @@ import httpx
 from sqlalchemy import select
 
 from recallradar_core.db import Recall
-from recallradar_core.db.session import get_sessionmaker
+from recallradar_core.db.session import get_sessionmaker, get_vector_sessionmaker
 from recallradar_core.logs import configure_logging
 from recallradar_core.settings import get_settings
 from recallradar_identify.vin import decode_vpic
 from recallradar_jobs.alerts import run, smtp_sender, vapid_push_sender
 from recallradar_matching.embed import Embedder
+from recallradar_matching.vectors import VectorStore
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         if settings.vapid_private_key
         else None,
+        vector_store=VectorStore(vectors) if (vectors := get_vector_sessionmaker()) else None,
     )
     print(json.dumps(asdict(stats)))
     return 1 if stats.emails_failed or stats.pushes_failed else 0

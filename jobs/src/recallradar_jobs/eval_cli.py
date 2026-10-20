@@ -23,13 +23,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from recallradar_core.db.session import get_sessionmaker
+from recallradar_core.db.session import get_sessionmaker, get_vector_sessionmaker
 from recallradar_core.enums import RecallSource
 from recallradar_core.settings import get_settings
 from recallradar_identify.parse import parse_input
 from recallradar_identify.query import ProductQuery
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import Tier, check, embed_query
+from recallradar_matching.vectors import VectorStore
 
 DEFAULT_CASES = Path("data/labels/m1_smoke.jsonl")
 INGESTED = [
@@ -86,13 +87,19 @@ def judge(case: dict[str, Any], got: Tier, got_recalls: list[str]) -> list[str]:
 
 def evaluate(cases: list[dict[str, Any]], embedder: Embedder) -> list[Outcome]:
     sessions = get_sessionmaker()
+    vectors = get_vector_sessionmaker()
+    store = VectorStore(vectors) if vectors else None
     outcomes = []
     for case in cases:
         query = to_query(case["type"], case["input"])
         started = time.perf_counter()
         with sessions() as session:
             result = check(
-                session, query, embedding=embed_query(embedder, query), ingested=INGESTED
+                session,
+                query,
+                embedding=embed_query(embedder, query),
+                ingested=INGESTED,
+                vector_store=store,
             )
         seconds = time.perf_counter() - started
         got_recalls = [f"{m.recall.source}:{m.recall.source_recall_id}" for m in result.matches]

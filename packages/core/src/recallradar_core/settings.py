@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     environment: Environment = Environment.LOCAL
     database_url: str = LOCAL_DATABASE_URL
+    # Product embeddings in another database (production: a second Neon project, since Neon's
+    # free plan caps a database at 512 MiB). Unset: the main database holds them.
+    vector_database_url: str | None = None
     log_level: str = "INFO"
     sentry_dsn: str | None = None
     # Where downloaded ML models (embeddings) are cached. The API image bakes them in.
@@ -44,12 +47,12 @@ class Settings(BaseSettings):
     vapid_private_key: SecretStr | None = None
     vapid_subject: str = "mailto:alerts@localhost"
 
-    @field_validator("database_url")
+    @field_validator("database_url", "vector_database_url")
     @classmethod
-    def _use_psycopg_driver(cls, value: str) -> str:
+    def _use_psycopg_driver(cls, value: str | None) -> str | None:
         # Hosts like Neon hand out postgres:// or postgresql:// URLs; SQLAlchemy needs the driver.
         for prefix in ("postgres://", "postgresql://"):
-            if value.startswith(prefix):
+            if value and value.startswith(prefix):
                 return "postgresql+psycopg://" + value.removeprefix(prefix)
         return value
 

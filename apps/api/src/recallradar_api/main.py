@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from recallradar_api import __version__
 from recallradar_api.routes import check, health, me, recalls
 from recallradar_api.state import AppState, default_state
-from recallradar_core.db.session import get_sessionmaker
+from recallradar_core.db.session import get_sessionmaker, get_vector_sessionmaker
 from recallradar_core.logs import configure_logging
 from recallradar_core.settings import Settings, get_settings
 from recallradar_matching.embed import Embedder
@@ -38,7 +38,9 @@ def create_app(settings: Settings | None = None, state: AppState | None = None) 
         if state is None:
             embedder = Embedder(settings.model_cache_dir)
             embedder.warm_up()  # load the model before the first check, not during it
-            app.state.recallradar = default_state(get_sessionmaker(), embedder)
+            app.state.recallradar = default_state(
+                get_sessionmaker(), embedder, get_vector_sessionmaker()
+            )
         else:
             app.state.recallradar = state
         yield

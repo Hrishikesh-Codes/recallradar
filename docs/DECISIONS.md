@@ -81,6 +81,37 @@ why, and what it costs.
   60/60 with 4 meat cases (still a tuning set).
 - **FSIS recalls are emailed too;** like NHTSA's, the data has no restriction on alerts.
 
+### Storage: two Neon projects
+
+- **Production hit Neon's real limit.** The daily sync failed from 2026-10-17 with "project size
+  limit (512 MB) has been exceeded". The project's settings say `branch_logical_size_limit`
+  512 MiB; the pricing page's "1 GB per project" is the total across branches, and a branch
+  inherits its parent's data, so a second branch doesn't help. The database had been seeded by a
+  backfill on GitHub's runners (this network blocks port 5432), embedding in place: 513 MB with
+  dead rows. The full dataset is about 530 MB even when compact.
+- **Embeddings moved to a second free Neon project** (`product_vector`: product id and vector,
+  with the HNSW index), named by `VECTOR_DATABASE_URL`. Unset, the same table lives in the main
+  database, as it does locally and in tests. Measured after compaction, FSIS included: recalls
+  368 MB, vectors 161 MB, each with over 150 MB of room. Smoke set 60/60 either way; median check
+  latency 30 ms with one database, 32 ms with two (local).
+- **Alternatives measured and rejected.** Keeping one project needed cuts: storing the search
+  vector as an index expression (-38 MB), vehicles out of the text indexes (-4 MB), dropping
+  products' raw records (-41 MB, but SPEC §4.2 keeps them so parsing can be re-run), and sharing
+  vectors between near-identical products in one recall (-23 to -40 MB). TOAST compression with
+  lz4 made the database bigger. The best lossless result, about 475 MB, left little room and none
+  for M4's passages. Hosting Postgres on the Oracle VM waits on that account.
+- **`recall_product.needs_embedding` replaces "embedding is null".** When a product's embedded
+  text changes it's flagged, and the old vector keeps serving searches until the embed job
+  replaces it. The embed job writes vectors first and clears flags second, so a failure in
+  between only repeats work. There's no foreign key between the databases; products are never
+  deleted.
+- **Production is rebuilt by a manual workflow** (*Seed production database*): backfill and embed
+  on the runner, then `scripts/seed-database.sh --replace` truncates the recall tables (a full
+  Neon database can't be compacted in place), migrates, copies compact rows, and builds the
+  vector index once. It refuses if production has user accounts, since their watch lists
+  reference recalls. Tested locally: a second `--replace` run gives the same 368 MB.
+- **A cost:** a cold check can wake two Neon computes instead of one (they start in parallel).
+
 ### Label photos
 
 - **OCR runs in the browser (Tesseract.js 7), so photos never leave the device;** only the text
@@ -158,7 +189,8 @@ why, and what it costs.
 ### Storage (Neon free plan: 1 GB per project)
 
 - Neon's free plan is **1 GB per project** (neon.com/pricing, checked 2026-10-13); M0 planned for
-  0.5 GB, the older limit.
+  0.5 GB, the older limit. **Corrected in M2:** that 1 GB is the project total; each database
+  branch is capped at 512 MiB, which production hit (see M2, "Storage: two Neon projects").
 - Measured on the full backfill with every product embedded, after `VACUUM FULL`: **427 MB**
   (products 370 MB, of which the HNSW index is 83 MB; recalls 48 MB). Straight after embedding it
   was 489 MB, because every embedding is an UPDATE that leaves a dead row, so production is seeded

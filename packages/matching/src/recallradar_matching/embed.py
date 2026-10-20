@@ -14,6 +14,8 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from recallradar_core.db import Recall, RecallProduct
+from recallradar_matching import vectors
+from recallradar_matching.vectors import VectorStore
 
 logger = logging.getLogger("recallradar.matching.embed")
 
@@ -72,8 +74,13 @@ def embed_missing(
     embedder: Embedder,
     batch_size: int = 512,
     limit: int | None = None,
+    vector_store: VectorStore | None = None,
 ) -> int:
-    """Embed recall products (except vehicles) that have no embedding yet; returns the count."""
+    """Embed recall products (except vehicles) that need it; returns the count.
+
+    With a `vector_store` the vectors are written there first, then the products are marked
+    done, so a failure in between only means embedding them again next time.
+    """
     done = 0
     while limit is None or done < limit:
         with sessions.begin() as session:
@@ -86,7 +93,7 @@ def embed_missing(
                     RecallProduct.category,
                 )
                 .join(Recall, Recall.id == RecallProduct.recall_id)
-                .where(RecallProduct.embedding.is_(None))
+                .where(RecallProduct.needs_embedding)
                 # Vehicles are matched on make, model and year, never by similarity.
                 .where(RecallProduct.vehicle_make.is_(None))
                 .order_by(RecallProduct.id)
@@ -94,18 +101,21 @@ def embed_missing(
             ).all()
             if not rows:
                 break
-            vectors = embedder.passages(
+            embeddings = embedder.passages(
                 [
                     product_text(name, brand or firm, category)
                     for _, name, brand, firm, category in rows
                 ]
             )
+            pairs = [(row.id, vector) for row, vector in zip(rows, embeddings, strict=True)]
+            if vector_store is None:
+                vectors.save(session, pairs)
+            else:
+                vector_store.save(pairs)
             session.execute(
-                update(RecallProduct),
-                [
-                    {"id": row.id, "embedding": vector}
-                    for row, vector in zip(rows, vectors, strict=True)
-                ],
+                update(RecallProduct)
+                .where(RecallProduct.id.in_([row.id for row in rows]))
+                .values(needs_embedding=False)
             )
             done += len(rows)
         logger.info("embedded", extra={"products": done})

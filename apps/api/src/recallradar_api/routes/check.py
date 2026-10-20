@@ -33,6 +33,7 @@ def check_product(
         barcodes=state.barcodes,
         coverage=state.coverage,
         vins=state.vins,
+        vectors=state.vectors,
     )
 
 

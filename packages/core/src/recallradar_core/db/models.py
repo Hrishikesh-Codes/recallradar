@@ -144,7 +144,9 @@ class RecallProduct(TimestampMixin, Base):
             persisted=True,
         ),
     )
-    embedding: Mapped[list[float] | None] = mapped_column(HALFVEC(EMBEDDING_DIM))
+    # The embedding lives in ProductVector (possibly another database); this says whether it's
+    # missing or stale (the embedded text changed). Vehicles are never embedded.
+    needs_embedding: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
 
     recall: Mapped[Recall] = relationship(back_populates="products")
 
@@ -162,19 +164,37 @@ class RecallProduct(TimestampMixin, Base):
             text(f"left(product_name, {NAME_PREFIX_CHARS}) gin_trgm_ops"),
             postgresql_using="gin",
         ),
-        Index(
-            "ix_recall_product_embedding_hnsw",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_with={"m": 16, "ef_construction": 64},
-            postgresql_ops={"embedding": "halfvec_cosine_ops"},
-        ),
         Index(None, "vehicle_make", "vehicle_model"),
         Index(
             "ix_recall_product_brand_trgm",
             "brand",
             postgresql_using="gin",
             postgresql_ops={"brand": "gin_trgm_ops"},
+        ),
+    )
+
+
+class ProductVector(Base):
+    """A recall product's embedding, for nearest-neighbour search.
+
+    Kept apart from `recall_product` so it can live in its own database (VECTOR_DATABASE_URL):
+    Neon's free plan caps a database at 512 MiB, and vectors with their HNSW index are about
+    160 MB of the total. Without that setting it is a table in the main database. No foreign
+    key, since the product may be in another database; products are never deleted.
+    """
+
+    __tablename__ = "product_vector"
+
+    product_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    embedding: Mapped[list[float]] = mapped_column(HALFVEC(EMBEDDING_DIM))
+
+    __table_args__ = (
+        Index(
+            "ix_product_vector_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "halfvec_cosine_ops"},
         ),
     )
 

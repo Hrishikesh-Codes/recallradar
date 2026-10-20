@@ -5,7 +5,7 @@ values the next one needs. Secrets go only into each service's settings, never i
 
 | Piece | Service | Free plan limits that matter |
 |---|---|---|
-| Database | Neon | 1 GB per project, 100 CU-hours/month, scales to zero after 5 minutes |
+| Database | Neon (two projects) | 512 MiB per database (branch), 100 CU-hours/month per project, scales to zero after 5 minutes |
 | API | Oracle Cloud Always Free (Ampere A1 VM) | 4 ARM cores and 24 GB in total; always on. Sign-up verifies a card; Always Free resources aren't charged |
 | Web | Vercel (Hobby) | Non-commercial use |
 | Email | Resend | 3,000 emails/month, 100/day; needs a verified domain |
@@ -13,18 +13,34 @@ values the next one needs. Secrets go only into each service's settings, never i
 
 ## 1. Database (Neon)
 
-1. Create a project (Postgres 17, the version CI and Docker use) in a US region.
-2. Copy two connection strings from *Connect*: the **direct** one (for migrations and seeding)
-   and the **pooled** one (`-pooler` in the host, for the web app and API).
-3. Seed it from a local database that already has the backfill and embeddings
-   (`make sync MODE=backfill && make embed`), about 25 seconds:
+Neon's free plan caps each database branch at 512 MiB (the "1 GB per project" on its pricing
+page is the project total), and the full dataset is about 530 MB. So there are two projects:
+recalls in one (368 MB measured), product embeddings with their vector index in the other
+(161 MB). See DECISIONS.md, "Storage".
+
+1. Create two projects in the same US region (recalls on Postgres 17, the version CI and Docker
+   use; 18 works for the vectors project, which holds one table), e.g.
+   `recallradar` and `recallradar-vectors`.
+2. From each project's *Connect*, copy the **direct** connection string (for jobs, migrations,
+   and seeding) and the **pooled** one (`-pooler` in the host, for the web app and API).
+3. Add the direct strings as repository secrets: `DATABASE_URL` and `VECTOR_DATABASE_URL`.
+4. Seed both from GitHub: *Actions → Seed production database → Run workflow*, typing
+   `replace recall data`. It backfills and embeds everything on the runner (about 90 minutes,
+   mostly embedding), then copies compact rows into Neon and builds the vector index once. It
+   refuses to run if production has user accounts. The same script works from a machine that
+   can reach Neon on port 5432:
 
    ```bash
-   scripts/seed-database.sh postgresql://recallradar:recallradar@localhost:5432/recallradar "<neon direct URL>"
+   scripts/seed-database.sh --replace postgresql://recallradar:recallradar@localhost:5432/recallradar "<recalls direct URL>" "<vectors direct URL>"
    ```
 
-   It migrates the schema, copies the recall tables, builds the vector index once, and prints the
-   counts and database size (433 MB measured for the full 2015+ data).
+5. USDA FSIS blocks scripted downloads, so meat recalls aren't in the seed. Import them from a
+   machine that can reach Neon, with a copy of FSIS's API response saved from a browser:
+
+   ```bash
+   DATABASE_URL="<recalls direct URL>" uv run recallradar-sync --source fsis --mode backfill --file fsis.json
+   DATABASE_URL="<recalls direct URL>" VECTOR_DATABASE_URL="<vectors direct URL>" uv run recallradar-embed
+   ```
 
 ## 2. Email (Resend)
 
@@ -64,7 +80,8 @@ itself: every 10 minutes it checks `main` and deploys the newest commit whose CI
    | Name | Value |
    |---|---|
    | `API_DOMAIN` | the name from step 3 |
-   | `DATABASE_URL` | Neon **pooled** URL |
+   | `DATABASE_URL` | the recalls project's **pooled** URL |
+   | `VECTOR_DATABASE_URL` | the vectors project's **pooled** URL |
    | `API_TOKEN_SECRET` | `openssl rand -hex 32` (the web app gets the same value) |
    | `CORS_ORIGINS` | the web app's URL, e.g. `https://recallradar.vercel.app` |
    | `SENTRY_DSN` | optional |
@@ -89,10 +106,10 @@ the deployed commit is in `/opt/recallradar/deployed`.
    | Name | Value |
    |---|---|
    | `NEXT_PUBLIC_API_URL` | `https://<API_DOMAIN>` |
-   | `DATABASE_URL` | Neon **pooled** URL |
+   | `DATABASE_URL` | the recalls project's **pooled** URL (accounts live there too) |
    | `BETTER_AUTH_URL` | the site's URL |
    | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
-   | `API_TOKEN_SECRET` | same value as the Space's |
+   | `API_TOKEN_SECRET` | same value as the VM's |
    | `SMTP_URL` | the Resend SMTP URL |
    | `MAIL_FROM` | the sign-in sender |
 
@@ -105,7 +122,8 @@ In the repo's Actions settings:
 
 | Name | Kind | Value |
 |---|---|---|
-| `DATABASE_URL` | secret | Neon **direct** URL |
+| `DATABASE_URL` | secret | the recalls project's **direct** URL |
+| `VECTOR_DATABASE_URL` | secret | the vectors project's **direct** URL |
 | `SMTP_URL` | secret | the Resend SMTP URL |
 | `OPENFDA_API_KEY` | secret | optional; raises openFDA's limit to 120,000 requests/day |
 | `SENTRY_DSN` | secret | optional |

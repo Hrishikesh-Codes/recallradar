@@ -38,6 +38,7 @@ from recallradar_core.enums import NOTICE_NAMES, SOURCE_LABELS, NoticeType, Reca
 from recallradar_identify.vin import Decoder
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import Match, Tier
+from recallradar_matching.vectors import VectorStore
 from recallradar_matching.watch import refresh
 
 logger = logging.getLogger("recallradar.jobs.alerts")
@@ -224,7 +225,9 @@ def recheck_all(
     embedder: Embedder,
     ingested: list[RecallSource],
     stats: RunStats,
+    *,
     decode_vin: Decoder | None = None,
+    vector_store: VectorStore | None = None,
 ) -> None:
     with sessions() as session:
         item_ids = list(session.scalars(select(WatchItem.id).order_by(WatchItem.id)))
@@ -234,7 +237,12 @@ def recheck_all(
             if item is None:  # deleted meanwhile
                 continue
             result = refresh(
-                session, item, embedder=embedder, ingested=ingested, decode_vin=decode_vin
+                session,
+                item,
+                embedder=embedder,
+                ingested=ingested,
+                decode_vin=decode_vin,
+                vector_store=vector_store,
             )
             stats.items += 1
             stats.new_matches += len(result.new_matches)
@@ -430,11 +438,14 @@ def run(
     web_url: str,
     decode_vin: Decoder | None = None,
     push_sender: PushSender | None = None,
+    vector_store: VectorStore | None = None,
 ) -> RunStats:
     stats = RunStats()
     started = time.perf_counter()
     stats.demo_accounts_deleted = delete_old_demo_accounts(sessions)
-    recheck_all(sessions, embedder, ingested, stats, decode_vin)
+    recheck_all(
+        sessions, embedder, ingested, stats, decode_vin=decode_vin, vector_store=vector_store
+    )
     if sender is not None:
         with sessions() as session:
             outgoing = pending_emails(session, web_url)

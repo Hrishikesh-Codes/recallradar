@@ -50,9 +50,7 @@ def test_upsert_is_idempotent_and_detects_changes(sessions: sessionmaker[Session
     assert (again.recalls_unchanged, again.products_unchanged) == (13, 13)
 
     with sessions.begin() as session:
-        session.execute(
-            text("UPDATE recall_product SET embedding = array_fill(0.1, ARRAY[384])::halfvec")
-        )
+        session.execute(text("UPDATE recall_product SET needs_embedding = false"))
     changed = cpsc.parse(load("cpsc/recalls_by_id.json")[0])
     changed.products[0].product_name += " (corrected)"
     changed.raw["Title"] = "edited"
@@ -63,11 +61,11 @@ def test_upsert_is_idempotent_and_detects_changes(sessions: sessionmaker[Session
         result = store.upsert(session, [changed, requantified])
     assert (result.recalls_updated, result.products_updated) == (1, 2)
     with sessions() as session:
-        embeddings = session.execute(
-            select(RecallProduct.product_name, RecallProduct.embedding)
+        flags = session.execute(
+            select(RecallProduct.product_name, RecallProduct.needs_embedding)
         ).all()
-    cleared = [name for name, embedding in embeddings if embedding is None]
-    assert len(cleared) == 1 and cleared[0].endswith("(corrected)")
+    stale = [name for name, needs_embedding in flags if needs_embedding]
+    assert len(stale) == 1 and stale[0].endswith("(corrected)")
 
     # A parser fix with the same source data still updates the stored recall.
     reparsed = cpsc.parse(load("cpsc/recalls_by_id.json")[2])

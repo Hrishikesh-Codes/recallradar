@@ -12,6 +12,7 @@ from recallradar_api.checking import BarcodeLookups, CoverageCache, VinDecoder
 from recallradar_api.ratelimit import RateLimiter
 from recallradar_identify.barcode import USER_AGENT
 from recallradar_matching.embed import Embedder
+from recallradar_matching.vectors import VectorStore
 
 
 @dataclass
@@ -23,9 +24,15 @@ class AppState:
     check_limits: list[RateLimiter]
     feedback_limits: list[RateLimiter]
     vins: VinDecoder | None = None
+    # Embeddings in their own database; None when the main database holds them.
+    vectors: VectorStore | None = None
 
 
-def default_state(sessions: sessionmaker[Session], embedder: Embedder) -> AppState:
+def default_state(
+    sessions: sessionmaker[Session],
+    embedder: Embedder,
+    vector_sessions: sessionmaker[Session] | None = None,
+) -> AppState:
     client = httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=10)
     return AppState(
         sessions=sessions,
@@ -39,6 +46,7 @@ def default_state(sessions: sessionmaker[Session], embedder: Embedder) -> AppSta
         ],
         feedback_limits=[RateLimiter(limit=30, window_seconds=3600)],
         vins=VinDecoder(client),
+        vectors=VectorStore(vector_sessions) if vector_sessions else None,
     )
 
 

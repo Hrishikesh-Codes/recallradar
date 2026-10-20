@@ -2,7 +2,8 @@
 
 Recalls are keyed on (source, source_recall_id), products on (recall, source_product_id). A row
 whose content hash is unchanged is left alone. A changed product keeps its embedding unless the
-text it was computed from (name, brand, category) changed; then the embed job recomputes it.
+text it was computed from (name, brand, category) changed; then it's flagged and the embed job
+recomputes it (the old vector serves searches meanwhile).
 Nothing is deleted: FDA events gain products week by week.
 """
 
@@ -10,7 +11,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import case, func, insert, null, or_, select, text, update
+from sqlalchemy import case, func, insert, or_, select, text, true, update
 from sqlalchemy.orm import Session
 
 from recallradar_core.db import Recall, RecallProduct
@@ -164,7 +165,9 @@ def upsert(session: Session, records: Iterable[RecallRecord]) -> UpsertStats:
                     .where(RecallProduct.id == found[0])
                     .values(
                         **values,
-                        embedding=case((text_changed, null()), else_=RecallProduct.embedding),
+                        needs_embedding=case(
+                            (text_changed, true()), else_=RecallProduct.needs_embedding
+                        ),
                         updated_at=func.now(),
                     )
                 )

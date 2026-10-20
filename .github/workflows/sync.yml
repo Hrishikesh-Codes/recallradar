@@ -28,6 +28,8 @@ jobs:
     env:
       ENVIRONMENT: production
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Embeddings live in a second Neon project (free databases are capped at 512 MiB).
+      VECTOR_DATABASE_URL: ${{ secrets.VECTOR_DATABASE_URL }}
       OPENFDA_API_KEY: ${{ secrets.OPENFDA_API_KEY }}
       SMTP_URL: ${{ secrets.SMTP_URL }}
       MAIL_FROM: ${{ vars.MAIL_FROM }}

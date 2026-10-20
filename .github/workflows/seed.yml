@@ -1,0 +1,71 @@
+name: Seed production database
+
+# Rebuilds production's recall data from scratch: a full backfill and every embedding in a
+# throwaway Postgres on the runner, then a compact copy into Neon (scripts/seed-database.sh).
+# Use it for a new database, or to rebuild a bloated one: Neon's free plan caps a database at
+# 512 MiB and a full one can't be compacted in place. It refuses if Neon has user accounts.
+#
+# FSIS refuses scripted requests, so meat recalls aren't included (see docs/DEPLOY.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "replace recall data" to empty and refill production''s recall tables'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync # never alongside the daily sync
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    if: inputs.confirm == 'replace recall data'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: recallradar
+          POSTGRES_PASSWORD: recallradar
+          POSTGRES_DB: recallradar
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U recallradar -d recallradar"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://recallradar:recallradar@localhost:5432/recallradar
+      OPENFDA_API_KEY: ${{ secrets.OPENFDA_API_KEY }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - run: uv sync --package recallradar-jobs --frozen --no-dev
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/recallradar/models
+          key: embedding-model-bge-small-en-v1.5
+      - name: Migrate the runner's database
+        run: uv run alembic -c packages/core/alembic.ini upgrade head
+      - name: Backfill every automated source
+        run: uv run recallradar-sync --source all --mode backfill
+      - name: Embed every product
+        run: uv run recallradar-embed
+      - name: Copy into production
+        env:
+          PG_EXEC: docker exec -i ${{ job.services.postgres.id }}
+          TARGET_URL: ${{ secrets.DATABASE_URL }}
+          TARGET_VECTOR_URL: ${{ secrets.VECTOR_DATABASE_URL }}
+        run: |
+          test -n "$TARGET_URL" && test -n "$TARGET_VECTOR_URL" \
+            || { echo "DATABASE_URL and VECTOR_DATABASE_URL secrets are required" >&2; exit 1; }
+          scripts/seed-database.sh --replace \
+            postgresql://recallradar:recallradar@localhost:5432/recallradar \
+            "$TARGET_URL" "$TARGET_VECTOR_URL"

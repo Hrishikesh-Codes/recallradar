@@ -23,6 +23,7 @@ from recallradar_identify.query import ProductQuery
 from recallradar_identify.vin import Decoded, decode_vpic
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import CheckResult, Match, check, embed_query
+from recallradar_matching.vectors import VectorStore
 
 logger = logging.getLogger("recallradar.api.check")
 
@@ -259,6 +260,7 @@ def run_check(
     barcodes: BarcodeLookups | None,
     coverage: CoverageCache,
     vins: VinDecoder | None = None,
+    vectors: VectorStore | None = None,
 ) -> schemas.CheckResponse:
     started = time.perf_counter()
     query = build_query(session, request, barcodes, vins)
@@ -268,6 +270,7 @@ def run_check(
         query,
         embedding=embed_query(embedder, query),
         ingested=[s.source for s in sources],
+        vector_store=vectors,
     )
     check_id = uuid.uuid4()
     elapsed_ms = round((time.perf_counter() - started) * 1000)

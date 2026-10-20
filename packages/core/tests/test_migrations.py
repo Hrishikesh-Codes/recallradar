@@ -10,7 +10,7 @@ from sqlalchemy import Engine, create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from recallradar_core.db import EMBEDDING_DIM, Base, Recall, RecallProduct
+from recallradar_core.db import EMBEDDING_DIM, Base, ProductVector, Recall, RecallProduct
 from recallradar_core.db.migrate import alembic_config
 from recallradar_core.enums import RecallSource
 
@@ -94,10 +94,11 @@ def test_unknown_source_is_rejected_by_the_database(session: Session) -> None:
 
 def test_product_search_text_and_embedding_roundtrip(session: Session) -> None:
     recall = _recall()
-    recall.products.append(
-        _product(brand="Example Brand", model_keys=["FP1234"], embedding=[0.5] * EMBEDDING_DIM)
-    )
+    recall.products.append(_product(brand="Example Brand", model_keys=["FP1234"]))
     session.add(recall)
+    session.flush()
+    product_id = recall.products[0].id
+    session.add(ProductVector(product_id=product_id, embedding=[0.5] * EMBEDDING_DIM))
     session.flush()
 
     matched = session.scalar(
@@ -107,8 +108,11 @@ def test_product_search_text_and_embedding_roundtrip(session: Session) -> None:
     )
     assert matched == recall.products[0].id
 
-    stored = session.scalar(select(RecallProduct.embedding))
+    stored = session.scalar(
+        select(ProductVector.embedding).where(ProductVector.product_id == product_id)
+    )
     assert stored == [0.5] * EMBEDDING_DIM
+    assert session.scalar(select(RecallProduct.needs_embedding)) is True
     assert session.scalar(select(RecallProduct.model_keys)) == ["FP1234"]
     assert session.scalar(select(RecallProduct.restrictions)) == []
 

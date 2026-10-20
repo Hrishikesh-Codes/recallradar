@@ -1,7 +1,8 @@
 # Architecture
 
-RecallRadar is a Next.js PWA in front of a FastAPI service, backed by one Postgres database that
-scheduled GitHub Actions jobs keep filled with official recall data. Everything runs on free tiers
+RecallRadar is a Next.js PWA in front of a FastAPI service, backed by Postgres (two free Neon
+projects: recalls, and their embeddings) that scheduled GitHub Actions jobs keep filled with
+official recall data. Everything runs on free tiers
 (SPEC §3.2).
 
 ## System
@@ -23,8 +24,9 @@ flowchart LR
     MATCH["Matching engine<br/>bge-small embeddings + rules"]
   end
 
-  subgraph Neon["Neon Postgres"]
-    DB[("recalls · products · accounts<br/>watch list · alerts · events<br/>pgvector · pg_trgm")]
+  subgraph Neon["Neon Postgres (two free projects)"]
+    DB[("recalls · products · accounts<br/>watch list · alerts · events<br/>pg_trgm")]
+    VEC[("product embeddings<br/>pgvector HNSW")]
   end
 
   subgraph GHA["GitHub Actions cron (daily)"]
@@ -43,9 +45,11 @@ flowchart LR
   BFF --> MAIL
   API --> MATCH
   API --> DB
+  MATCH --> VEC
   API --> OFF
   SYNC --> SOURCES
   SYNC --> DB
+  SYNC --> VEC
   SYNC --> MAIL
   API -.-> LLM
 
@@ -72,7 +76,9 @@ flowchart LR
   plain text when the API can't be reached.
 - One database is the system of record: the API, the web server's auth, the jobs and the
   evaluation all read the same tables, and Alembic migrations in `packages/core` are the only way
-  the schema changes (Better Auth's tables included).
+  the schema changes (Better Auth's tables included). Product embeddings are the exception: they
+  live in a second database (`VECTOR_DATABASE_URL`, one table) because each free Neon database is
+  capped at 512 MiB; the vector retriever and the embed job are the only code that touches it.
 
 ## Data model (M1)
 

@@ -138,7 +138,14 @@ def _add_item(session: Session, state: State, user: AuthUser, body: schemas.NewI
     session.add(item)
     session.flush()
     sources = [s.source for s in state.coverage.get(session)]
-    refresh(session, item, embedder=state.embedder, ingested=sources, query=query)
+    refresh(
+        session,
+        item,
+        embedder=state.embedder,
+        ingested=sources,
+        query=query,
+        vector_store=state.vectors,
+    )
     session.flush()
     return item
 

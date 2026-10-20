@@ -30,7 +30,7 @@ from recallradar_core.enums import NOTICE_NAMES, SOURCE_LABELS, NoticeType, Reca
 from recallradar_identify.query import ProductQuery
 from recallradar_identify.text import model_tokens
 from recallradar_ingest.extract.text import code_key
-from recallradar_matching import vehicles
+from recallradar_matching import vectors, vehicles
 from recallradar_matching.embed import Embedder
 from recallradar_matching.text import (
     GENERIC,
@@ -41,6 +41,7 @@ from recallradar_matching.text import (
     title_product_phrase,
     tokens,
 )
+from recallradar_matching.vectors import VectorStore
 
 CANDIDATES_PER_RETRIEVER = 50
 RRF_K = 60
@@ -122,7 +123,10 @@ def _tsquery(words: Sequence[str]) -> str | None:
 
 
 def _retrieve(
-    session: Session, query: ProductQuery, embedding: list[float] | None
+    session: Session,
+    query: ProductQuery,
+    embedding: list[float] | None,
+    store: VectorStore | None,
 ) -> dict[int, Signals]:
     signals: dict[int, Signals] = {}
 
@@ -189,14 +193,11 @@ def _retrieve(
             get(product_id).trigram_similarity = float(score)
 
     if embedding is not None:
-        session.execute(text("SET LOCAL hnsw.ef_search = 400"))
-        distance = RecallProduct.embedding.cosine_distance(embedding)
-        vector_rows = session.execute(
-            select(RecallProduct.id, distance)
-            .where(RecallProduct.embedding.is_not(None))
-            .order_by(distance)
-            .limit(CANDIDATES_PER_RETRIEVER)
-        ).all()
+        vector_rows = (
+            store.nearest(embedding, CANDIDATES_PER_RETRIEVER)
+            if store
+            else vectors.nearest(session, embedding, CANDIDATES_PER_RETRIEVER)
+        )
         fuse([product_id for product_id, _ in vector_rows])
         for product_id, dist in vector_rows:
             get(product_id).vector_similarity = 1.0 - float(dist)
@@ -446,8 +447,12 @@ def check(
     *,
     embedding: list[float] | None,
     ingested: Sequence[RecallSource],
+    vector_store: VectorStore | None = None,
 ) -> CheckResult:
-    """Check one product against every ingested recall."""
+    """Check one product against every ingested recall.
+
+    `vector_store` is where the embeddings are when not in `session`'s database.
+    """
     notes = list(query.notes)
     has_input = bool(
         query.upcs or query.model_numbers or (query.search_text() and tokens(query.search_text()))
@@ -460,7 +465,7 @@ def check(
         if vehicle is not None:
             return _vehicle_result(vehicle, ingested, notes)
 
-    signals = _retrieve(session, query, embedding)
+    signals = _retrieve(session, query, embedding, vector_store)
     rows = session.execute(
         select(RecallProduct, Recall)
         .join(Recall, Recall.id == RecallProduct.recall_id)

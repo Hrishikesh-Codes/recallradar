@@ -22,6 +22,7 @@ from recallradar_identify.query import ProductQuery
 from recallradar_identify.vin import Decoder
 from recallradar_matching.embed import Embedder
 from recallradar_matching.engine import CheckResult, Match, Tier, check, embed_query
+from recallradar_matching.vectors import VectorStore
 
 _MATCHING = frozenset({Tier.RECALLED, Tier.CHECK_UNIT})
 
@@ -79,10 +80,17 @@ def refresh(
     ingested: Sequence[RecallSource],
     query: ProductQuery | None = None,
     decode_vin: Decoder | None = None,
+    vector_store: VectorStore | None = None,
 ) -> Refresh:
     """Re-check `item`, store its current matches, and report the ones that are new."""
     query = query or item_query(session, item, decode_vin)
-    result = check(session, query, embedding=embed_query(embedder, query), ingested=ingested)
+    result = check(
+        session,
+        query,
+        embedding=embed_query(embedder, query),
+        ingested=ingested,
+        vector_store=vector_store,
+    )
     stored = {
         m.recall_id: m
         for m in session.scalars(select(WatchMatch).where(WatchMatch.item_id == item.id))

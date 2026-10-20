@@ -34,9 +34,9 @@ if a recall is announced later.
 | What | Result |
 |---|---|
 | Recalls indexed | 42,304: CPSC 3,710 · FDA food 6,353 · drugs 3,824 · devices 11,969 · USDA FSIS 1,139 (since 2015) · NHTSA 15,309 (since 2010) |
-| Database size, everything embedded | 517 MB (Neon's free plan: 1 GB) |
+| Database size, everything embedded | 368 MB recalls + 161 MB vectors, in two Neon projects (free databases are capped at 512 MiB each) |
 | Vector search vs exact search | recall@50 0.988 at 1.9 ms median (80 queries) |
-| Check latency (local, M-series Mac) | 39 ms median over the 60-case smoke set |
+| Check latency (local, M-series Mac) | 32 ms median over the 60-case smoke set, vectors in a separate database |
 | Smoke set | 60/60 after tuning on it: a regression check, **not** an accuracy estimate (M3) |
 
 ## What's here

@@ -19,7 +19,12 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+        // Software WebGL, so the landing page's field renders (and field.spec.ts can read it).
+        launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
+      },
     },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
     // Safari's engine: iPhones get the ZXing barcode fallback, not the native BarcodeDetector.

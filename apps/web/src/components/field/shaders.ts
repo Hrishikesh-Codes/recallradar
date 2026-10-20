@@ -181,12 +181,27 @@ void main() {
   vec3 c = grade(lum);
   // Panel tints: one redder, one warmer.
   c *= k == 1.0 ? vec3(1.04, 0.86, 0.8) : k == 2.0 ? vec3(1.0, 1.04, 0.95) : vec3(1.0);
-  c += (hash12(px + fract(u_time) * 97.0) - 0.5) * 0.06;
 
   // Dissolve in 8 px blocks, so the picture breaks up into the dot grid behind it.
   float block = hash12(floor(px / (8.0 * u_dpr)));
   if (block < u_dissolve) discard;
   colour = vec4(c, u_alpha);
+}`;
+
+// The panels render at half resolution (a quarter of the pixels: the noise is the expensive
+// part, and the picture is soft anyway); this scales them up and adds film grain at full size.
+export const COMPOSITE_FRAGMENT = /* glsl */ `#version 300 es
+precision highp float;
+uniform sampler2D u_panels;
+uniform vec2 u_res;
+uniform float u_time;
+out vec4 colour;
+${COLOURS}
+${NOISE}
+void main() {
+  vec4 c = texture(u_panels, gl_FragCoord.xy / u_res);
+  if (c.a <= 0.0) discard;
+  colour = vec4(c.rgb + (hash12(gl_FragCoord.xy + fract(u_time) * 97.0) - 0.5) * 0.06, c.a);
 }`;
 
 export const POINTS_VERTEX = /* glsl */ `#version 300 es

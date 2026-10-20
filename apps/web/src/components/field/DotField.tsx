@@ -11,6 +11,7 @@ import {
   type Section,
 } from "@/components/field/formations";
 import {
+  COMPOSITE_FRAGMENT,
   FULLSCREEN_VERTEX,
   MAX_SHADES,
   PANELS_FRAGMENT,
@@ -79,7 +80,8 @@ export function DotField() {
     if (!canvas || !gl) return;
     const panels = compile(gl, FULLSCREEN_VERTEX, PANELS_FRAGMENT);
     const points = compile(gl, POINTS_VERTEX, POINTS_FRAGMENT);
-    if (!panels || !points) return;
+    const composite = compile(gl, FULLSCREEN_VERTEX, COMPOSITE_FRAGMENT);
+    if (!panels || !points || !composite) return;
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const root = document.documentElement;
@@ -94,6 +96,22 @@ export function DotField() {
     const corner = gl.getAttribLocation(panels, "a_corner");
     gl.enableVertexAttribArray(corner);
     gl.vertexAttribPointer(corner, 2, gl.FLOAT, false, 0, 0);
+    const compositeVao = gl.createVertexArray();
+    gl.bindVertexArray(compositeVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    const compositeCorner = gl.getAttribLocation(composite, "a_corner");
+    gl.enableVertexAttribArray(compositeCorner);
+    gl.vertexAttribPointer(compositeCorner, 2, gl.FLOAT, false, 0, 0);
+
+    // Half-resolution target for the panels.
+    const panelTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, panelTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const panelTarget = gl.createFramebuffer();
+    let half = { width: 1, height: 1 };
 
     const pointsVao = gl.createVertexArray();
     const buffers: WebGLBuffer[] = [];
@@ -157,6 +175,8 @@ export function DotField() {
       ].map((n) => [n, u(points, n)]),
     );
 
+    const cu = Object.fromEntries(["u_panels", "u_res", "u_time"].map((n) => [n, u(composite, n)]));
+
     let dpr = 1;
     const resize = () => {
       const width = window.innerWidth;
@@ -165,6 +185,22 @@ export function DotField() {
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       gl.viewport(0, 0, canvas.width, canvas.height);
+      half = { width: Math.ceil(canvas.width / 2), height: Math.ceil(canvas.height / 2) };
+      gl.bindTexture(gl.TEXTURE_2D, panelTexture);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA8,
+        half.width,
+        half.height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        null,
+      );
+      gl.bindFramebuffer(gl.FRAMEBUFFER, panelTarget);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, panelTexture, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       // Phones resize as the address bar shows and hides; only rebuild for real changes.
       if (width !== builtFor.width || Math.abs(height - builtFor.height) > height * 0.2) {
         build(width, height);
@@ -173,6 +209,7 @@ export function DotField() {
     resize();
 
     const shades = new Float32Array(MAX_SHADES * 4);
+    const halfShades = new Float32Array(MAX_SHADES * 4);
     const caps = new Float32Array(MAX_SHADES);
     const readShades = () => {
       const elements = document.querySelectorAll<HTMLElement>("[data-field-shade]");
@@ -186,6 +223,7 @@ export function DotField() {
         caps[n] = element.dataset.fieldShade === "large" ? 0.45 : 0.3;
         n++;
       }
+      for (let i = 0; i < shades.length; i++) halfShades[i] = shades[i]! / 2;
       return n;
     };
 
@@ -207,44 +245,74 @@ export function DotField() {
       }
       const nShades = readShades();
 
+      // Panels: the hero and the closing section, wherever they are on screen, drawn at half
+      // resolution into a texture first.
+      const tall = window.innerWidth < window.innerHeight;
+      const panelDraws: { rect: DOMRect; presence: number; layout: number }[] = [];
+      sections
+        .filter((s) => s.formation === "panels")
+        .forEach((section, index) => {
+          const rect = section.element.getBoundingClientRect();
+          if (rect.bottom < 0 || rect.top > vh) return;
+          // How much of this section's picture is showing: all of it while held, fading as the
+          // field morphs away from it (or towards it).
+          const isFirst = index === 0;
+          const leaving = state.from === "panels" && state.to !== "panels";
+          const arriving = state.to === "panels" && state.from !== "panels";
+          let presence = state.from === "panels" && state.to === "panels" ? 1 : 0;
+          if (leaving && isFirst) presence = 1 - state.t;
+          if (arriving && !isFirst) presence = state.t;
+          if (presence > 0.001) {
+            panelDraws.push({ rect, presence, layout: (isFirst ? 0 : 2) + (tall ? 1 : 0) });
+          }
+        });
+
+      if (panelDraws.length) {
+        const scale = dpr / 2;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, panelTarget);
+        gl.viewport(0, 0, half.width, half.height);
+        gl.disable(gl.BLEND);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(panels);
+        gl.bindVertexArray(quadVao);
+        gl.uniform2f(pu.u_res!, half.width, half.height);
+        gl.uniform1f(pu.u_time!, time);
+        gl.uniform1f(pu.u_dpr!, scale);
+        gl.uniform4fv(pu.u_shade!, halfShades);
+        gl.uniform1fv(pu.u_shadeCap!, caps);
+        gl.uniform1i(pu.u_shades!, nShades);
+        for (const { rect, presence, layout } of panelDraws) {
+          gl.uniform4f(
+            pu.u_rect!,
+            rect.left * scale,
+            rect.top * scale,
+            rect.width * scale,
+            rect.height * scale,
+          );
+          gl.uniform1f(pu.u_alpha!, 1);
+          gl.uniform1f(pu.u_dissolve!, 1 - presence);
+          gl.uniform1i(pu.u_layout!, layout);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.enable(gl.BLEND);
+      }
+
       gl.clearColor(1 / 255, 0, 1 / 255, 1);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
-      // Panels: the hero and the closing section, wherever they are on screen.
-      gl.useProgram(panels);
-      gl.bindVertexArray(quadVao);
-      gl.uniform2f(pu.u_res!, canvas.width, canvas.height);
-      gl.uniform1f(pu.u_time!, time);
-      gl.uniform1f(pu.u_dpr!, dpr);
-      gl.uniform4fv(pu.u_shade!, shades);
-      gl.uniform1fv(pu.u_shadeCap!, caps);
-      gl.uniform1i(pu.u_shades!, nShades);
-      const tall = window.innerWidth < window.innerHeight;
-      const panelSections = sections.filter((s) => s.formation === "panels");
-      panelSections.forEach((section, index) => {
-        const rect = section.element.getBoundingClientRect();
-        if (rect.bottom < 0 || rect.top > vh) return;
-        // How much of this section's picture is showing: all of it while held, fading as the
-        // field morphs away from it (or towards it).
-        const isFirst = index === 0;
-        const leaving = state.from === "panels" && state.to !== "panels";
-        const arriving = state.to === "panels" && state.from !== "panels";
-        let presence = state.from === "panels" && state.to === "panels" ? 1 : 0;
-        if (leaving && isFirst) presence = 1 - state.t;
-        if (arriving && !isFirst) presence = state.t;
-        if (presence <= 0.001) return;
-        gl.uniform4f(
-          pu.u_rect!,
-          rect.left * dpr,
-          rect.top * dpr,
-          rect.width * dpr,
-          rect.height * dpr,
-        );
-        gl.uniform1f(pu.u_alpha!, 1);
-        gl.uniform1f(pu.u_dissolve!, 1 - presence);
-        gl.uniform1i(pu.u_layout!, (isFirst ? 0 : 2) + (tall ? 1 : 0));
+      if (panelDraws.length) {
+        gl.useProgram(composite);
+        gl.bindVertexArray(compositeVao);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, panelTexture);
+        gl.uniform1i(cu.u_panels!, 0);
+        gl.uniform2f(cu.u_res!, canvas.width, canvas.height);
+        gl.uniform1f(cu.u_time!, time);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-      });
+      }
 
       // Dots.
       if (!(state.from === "panels" && state.to === "panels")) {
@@ -300,6 +368,10 @@ export function DotField() {
       gl.deleteBuffer(quad);
       gl.deleteVertexArray(quadVao);
       gl.deleteVertexArray(pointsVao);
+      gl.deleteVertexArray(compositeVao);
+      gl.deleteTexture(panelTexture);
+      gl.deleteFramebuffer(panelTarget);
+      gl.deleteProgram(composite);
       gl.deleteProgram(panels);
       gl.deleteProgram(points);
     };

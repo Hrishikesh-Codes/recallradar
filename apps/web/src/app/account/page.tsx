@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/site/PageHeader";
 
 import { deleteAccount, signOut, updateAlerts } from "@/app/account/actions";
 import { PushToggle } from "@/components/account/PushToggle";
@@ -124,10 +125,7 @@ async function Account({ searchParams }: { searchParams: PageProps<"/account">["
 export default function AccountPage({ searchParams }: PageProps<"/account">) {
   return (
     <section className="page-x flex min-h-svh flex-col gap-12 pt-32 pb-24">
-      <header>
-        <p className="eyebrow mb-4 text-muted-2">Account</p>
-        <h1 className="display text-display">Settings</h1>
-      </header>
+      <PageHeader eyebrow="Account" title={["Settings"]} />
       <Suspense fallback={<p className="text-muted-2">Loading…</p>}>
         <Account searchParams={searchParams} />
       </Suspense>

@@ -456,7 +456,20 @@
     pointer-events: none;
   }
 
-  /* "Checking" radar: hairline rings, dot field, and a rotating orange sweep. */
+  /* In the checking circle the canvas fills the circle, centred, no fade to the page. */
+  .radar-field--round {
+    border-radius: 50%;
+    overflow: clip;
+    mask-image: radial-gradient(circle, black 60%, transparent 72%);
+  }
+
+  .radar-field--round::after,
+  .radar-sweep:has([data-live])::after {
+    content: none;
+  }
+
+  /* "Checking" radar: hairline rings, dot field, and a rotating orange sweep (CSS fallback
+     under the WebGL radar). */
   .radar-sweep {
     position: relative;
     width: clamp(7rem, 20vw, 10rem);
@@ -487,6 +500,22 @@
     border-radius: inherit;
     background: conic-gradient(from 0deg, transparent 0 75%, rgb(255 157 0 / 0.55) 100%);
     animation: radar-spin 1.6s linear infinite;
+  }
+
+  /*
+   * App page headers: a still dot matrix (the field's grid, in CSS), brightest top right with an
+   * orange glow, fading out before it reaches the content.
+   */
+  .page-dots {
+    position: absolute;
+    inset: -8rem calc(-1 * var(--margin)) -4rem calc(-1 * var(--margin));
+    z-index: -1;
+    background:
+      radial-gradient(circle at 70% 30%, rgb(255 157 0 / 0.16), transparent 45%),
+      radial-gradient(var(--color-muted-3) 1.1px, transparent 1.6px) 0 0 / 14px 14px;
+    /* Transparent before every edge of the box, so the dots never stop at a line. */
+    mask-image: radial-gradient(ellipse 45% 70% at 55% 35%, black 15%, transparent 100%);
+    pointer-events: none;
   }
 
   /* Scanner viewfinder: a dotted frame where the barcode should go. */

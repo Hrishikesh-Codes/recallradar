@@ -6,9 +6,9 @@ import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/cn";
 
 /*
- * The hero's dot field with a radar sweep: a raw WebGL2 fragment shader (no 3D library). Each
- * dot brightens as the beam passes and fades behind it; a few "blips" glow orange longer.
- * Colours are the design tokens (bg-0, muted-3, accent). Decorative only.
+ * A dot field with a radar sweep: a raw WebGL2 fragment shader (no 3D library). Each dot
+ * brightens as the beam passes and fades behind it; a few "blips" glow orange longer. Colours
+ * are the design tokens (bg-0, muted-3, accent). Decorative only. Used while a check runs.
  */
 const VERTEX = `#version 300 es
 in vec2 position;
@@ -20,6 +20,8 @@ uniform vec2 u_res;
 uniform vec2 u_origin;
 uniform float u_time;
 uniform float u_dpr;
+uniform float u_spacing;   // CSS px between dots
+uniform float u_ringGap;   // CSS px between the faint range rings
 out vec4 color;
 
 const vec3 BG = vec3(1.0, 0.0, 1.0) / 255.0;
@@ -34,7 +36,7 @@ float hash(vec2 p) {
 }
 
 void main() {
-  float spacing = 16.0 * u_dpr;
+  float spacing = u_spacing * u_dpr;
   vec2 cell = floor(gl_FragCoord.xy / spacing);
   vec2 centre = (cell + 0.5) * spacing;
   float dist = length(gl_FragCoord.xy - centre);
@@ -49,7 +51,8 @@ void main() {
 
   float reach = max(u_res.x, u_res.y) * 0.95;
   float falloff = 1.0 - smoothstep(reach * 0.25, reach, radius);
-  float rings = 1.0 - smoothstep(0.0, 1.2 * u_dpr, abs(mod(radius, 180.0 * u_dpr) - 90.0 * u_dpr));
+  float gap = u_ringGap * u_dpr;
+  float rings = 1.0 - smoothstep(0.0, 1.2 * u_dpr, abs(mod(radius, gap) - gap * 0.5));
 
   float blip = step(0.988, hash(cell)) * exp(-behind * 0.7);
   float glow = clamp(trail * 0.8 + blip, 0.0, 1.0);
@@ -65,7 +68,21 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
   return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null;
 }
 
-export function RadarField({ className }: { className?: string }) {
+const DEFAULT_ORIGIN: [number, number] = [0.78, 0.62];
+const COMPACT = { spacing: 8, ringGap: 36 };
+const WIDE = { spacing: 16, ringGap: 180 };
+
+export function RadarField({
+  className,
+  origin = DEFAULT_ORIGIN,
+  compact = false,
+}: {
+  className?: string;
+  /** Where the sweep turns, as fractions of the width and height (y up). */
+  origin?: [number, number];
+  /** Finer dots and rings, for small sizes (the checking circle). */
+  compact?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reducedMotion = usePrefersReducedMotion();
 
@@ -83,6 +100,9 @@ export function RadarField({ className }: { className?: string }) {
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
     gl.useProgram(program);
+    // Running: CSS stand-ins (the checking circle's conic sweep) step aside.
+    const wrapper = canvas.parentElement;
+    if (wrapper) wrapper.dataset.live = "";
 
     // One triangle that covers the viewport.
     const buffer = gl.createBuffer();
@@ -93,7 +113,15 @@ export function RadarField({ className }: { className?: string }) {
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 
     const uniform = (name: string) => gl.getUniformLocation(program, name);
-    const [uRes, uOrigin, uTime, uDpr] = ["u_res", "u_origin", "u_time", "u_dpr"].map(uniform);
+    const [uRes, uOrigin, uTime, uDpr, uSpacing, uRingGap] = [
+      "u_res",
+      "u_origin",
+      "u_time",
+      "u_dpr",
+      "u_spacing",
+      "u_ringGap",
+    ].map(uniform);
+    const scale = compact ? COMPACT : WIDE;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     const resize = () => {
@@ -102,9 +130,10 @@ export function RadarField({ className }: { className?: string }) {
       canvas.height = Math.max(1, Math.round(height * dpr));
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(uRes!, canvas.width, canvas.height);
-      // Sweep from the right-hand side, behind the headline's empty space.
-      gl.uniform2f(uOrigin!, canvas.width * 0.78, canvas.height * 0.62);
+      gl.uniform2f(uOrigin!, canvas.width * origin[0], canvas.height * origin[1]);
       gl.uniform1f(uDpr!, dpr);
+      gl.uniform1f(uSpacing!, scale.spacing);
+      gl.uniform1f(uRingGap!, scale.ringGap);
     };
     resize();
 
@@ -142,8 +171,9 @@ export function RadarField({ className }: { className?: string }) {
       gl.deleteProgram(program);
       gl.deleteShader(vertex);
       gl.deleteShader(fragment);
+      if (wrapper) delete wrapper.dataset.live;
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, origin, compact]);
 
   return (
     <div aria-hidden className={cn("radar-field", className)}>

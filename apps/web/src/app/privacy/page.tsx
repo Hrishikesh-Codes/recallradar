@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { PageHeader } from "@/components/site/PageHeader";
+
 export const metadata: Metadata = {
   title: "Privacy",
   description: "What RecallRadar stores, why, and how to delete it.",
@@ -54,11 +56,9 @@ const SECTIONS: ReadonlyArray<{ title: string; body: string[] }> = [
 export default function PrivacyPage() {
   return (
     <section className="page-x flex min-h-svh flex-col gap-12 pt-32 pb-24">
-      <header className="max-w-3xl">
-        <p className="eyebrow mb-4 text-muted-2">Privacy</p>
-        <h1 className="display text-display text-balance">What we keep, and why</h1>
-        <p className="mt-4 text-muted-2">Last updated October 2026.</p>
-      </header>
+      <PageHeader eyebrow="Privacy" title={["What we keep,", "and why"]}>
+        Last updated October 2026.
+      </PageHeader>
       <div className="flex max-w-3xl flex-col gap-10">
         {SECTIONS.map((section) => (
           <section key={section.title} className="flex flex-col gap-3">

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { DemoButton } from "@/components/account/DemoButton";
 import { SignInForm } from "@/components/account/SignInForm";
+import { PageHeader } from "@/components/site/PageHeader";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -27,14 +28,10 @@ async function Form({ searchParams }: { searchParams: PageProps<"/sign-in">["sea
 export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   return (
     <section className="page-x flex min-h-svh flex-col gap-12 pt-32 pb-24">
-      <header className="max-w-3xl">
-        <p className="eyebrow mb-4 text-muted-2">My list</p>
-        <h1 className="display text-display text-balance">Keep watch on what you own</h1>
-        <p className="mt-4 max-w-prose text-muted-1">
-          Save products to a list. We re-check them every day and email you if a CPSC or NHTSA
-          recall matches one. FDA recalls show up on your list.
-        </p>
-      </header>
+      <PageHeader eyebrow="My list" title={["Keep watch on", "what you own"]}>
+        Save products to a list. We re-check them every day and email you if a CPSC, NHTSA or USDA
+        recall matches one. FDA recalls show up on your list.
+      </PageHeader>
       <div className="flex max-w-md flex-col gap-6">
         <Suspense>
           <Form searchParams={searchParams} />

@@ -110,6 +110,10 @@ why, and what it costs.
   Neon database can't be compacted in place), migrates, copies compact rows, and builds the
   vector index once. It refuses if production has user accounts, since their watch lists
   reference recalls. Tested locally: a second `--replace` run gives the same 368 MB.
+- **Production after the first seed (2026-10-20, no FSIS yet):** 41,181 recalls, 115,396
+  products and 78,184 vectors. Postgres reports 362 MB and 157 MB; Neon counts 384 MiB and
+  179 MiB of each 512 MiB cap. The run took 80 minutes, 75 of them embedding on the runner; the
+  copy into Neon took one. The daily sync passed again straight after.
 - **A cost:** a cold check can wake two Neon computes instead of one (they start in parallel).
 
 ### Label photos

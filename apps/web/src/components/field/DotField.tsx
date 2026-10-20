@@ -7,6 +7,7 @@ import {
   CAMERA_DISTANCE,
   fieldState,
   FORMATIONS,
+  gridSpacing,
   type Formation,
   type Section,
 } from "@/components/field/formations";
@@ -168,6 +169,7 @@ export function DotField() {
         "u_aspect",
         "u_res",
         "u_camera",
+        "u_spacing",
         "u_shade",
         "u_shadeCap",
         "u_shades",
@@ -325,6 +327,7 @@ export function DotField() {
         gl.uniform1f(qu.u_aspect!, window.innerWidth / vh);
         gl.uniform2f(qu.u_res!, canvas.width, canvas.height);
         gl.uniform1f(qu.u_camera!, CAMERA_DISTANCE);
+        gl.uniform1f(qu.u_spacing!, gridSpacing({ width: window.innerWidth, height: vh }));
         gl.uniform1f(qu.u_dpr!, dpr);
         gl.uniform4fv(qu.u_shade!, shades);
         gl.uniform1fv(qu.u_shadeCap!, caps);

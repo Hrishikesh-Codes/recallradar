@@ -58,10 +58,10 @@ float heat(vec2 p, float t, float seed) {
 }
 
 vec3 grade(float lum) {
-  vec3 c = mix(BG, EMBER, smoothstep(0.0, 0.32, lum));
-  c = mix(c, DEEP, smoothstep(0.28, 0.62, lum));
-  c = mix(c, SOL, smoothstep(0.58, 0.86, lum));
-  return mix(c, SAND, smoothstep(0.9, 1.05, lum) * 0.55);
+  vec3 c = mix(BG, EMBER, smoothstep(0.0, 0.3, lum));
+  c = mix(c, DEEP, smoothstep(0.26, 0.66, lum));
+  c = mix(c, SOL, smoothstep(0.7, 0.95, lum) * 0.85);
+  return mix(c, SAND, smoothstep(0.93, 1.05, lum) * 0.5);
 }
 `;
 
@@ -171,7 +171,9 @@ void main() {
   float h = heat(p, t, seed);
   // Long-exposure streaks on top of the smoke.
   float streak = noise(p * vec2(0.35, 11.0) + vec2(t * 0.15, seed)) - 0.5;
-  float lum = smoothstep(0.4, 0.8, h + streak * 0.24);
+  float lum = smoothstep(0.42, 0.84, h + streak * 0.24);
+  // Large dark shapes, like the silhouettes in a photograph.
+  lum *= smoothstep(0.3, 0.55, fbm(p * 0.32 + vec2(seed * 3.1, t * 0.02)));
   lum = clamp(lum * (k == 1.0 ? 0.85 : k == 2.0 ? 1.15 : 1.0), 0.0, 1.0);
   // A soft print vignette; the panel's own edge stays hard, so the collage reads.
   vec2 e = uv * (1.0 - uv) * 4.0;
@@ -221,6 +223,7 @@ uniform float u_time;
 uniform float u_aspect;
 uniform vec2 u_res;
 uniform float u_camera;
+uniform float u_spacing;      // grid spacing, CSS px (dot sizes scale with it)
 out vec3 v_colour;
 out float v_alpha;
 ${COLOURS}
@@ -241,27 +244,27 @@ Look formation(int f) {
     b = smoothstep(0.35, 0.85, b) * smoothstep(1.25, 0.2, length((screen - 0.5) * vec2(u_aspect, 1.0)));
     float twinkle = 0.75 + 0.25 * sin(u_time * (1.2 + a_seed * 2.0) + a_seed * 40.0);
     l.pos = a_grid;
-    l.colour = b > 0.42 ? mix(DEEP, SOL, smoothstep(0.42, 0.95, b)) : MOSS;
-    l.alpha = f == 0 ? 0.0 : a_inGrid * mix(0.5, 1.0, b) * twinkle;
-    l.size = mix(1.6, 3.3, b);
+    l.colour = b > 0.4 ? mix(DEEP * 0.85, mix(DEEP, SOL, 0.35), smoothstep(0.4, 0.95, b)) : MOSS * 0.8;
+    l.alpha = f == 0 ? 0.0 : a_inGrid * mix(0.6, 1.0, b) * twinkle;
+    l.size = mix(0.17, 0.62, b) * u_spacing;
     return l;
   }
   if (f == 2) {
     vec3 p = rotateY(u_time * 0.06) * a_cloud;
     p += 0.015 * vec3(sin(u_time * 0.7 + a_seed * 30.0), cos(u_time * 0.6 + a_seed * 20.0), 0.0);
     l.pos = p;
-    l.colour = a_seed > 0.82 ? MOSS * 1.6 : mix(DEEP, SOL, fract(a_seed * 7.0));
-    l.alpha = 0.85 * smoothstep(-1.2, 0.6, p.z);
-    l.size = 2.0;
+    l.colour = a_seed > 0.85 ? MOSS * 1.5 : mix(DEEP, SOL, fract(a_seed * 7.0) * 0.45);
+    l.alpha = 0.9 * smoothstep(-1.2, 0.6, p.z);
+    l.size = 0.22 * u_spacing;
     return l;
   }
   if (f == 3) {
     vec3 p = rotateX(0.22) * rotateY(u_time * 0.1) * a_torus;
     float front = smoothstep(-0.9, 0.9, p.z);
     l.pos = p;
-    l.colour = mix(MOSS * 1.4, mix(DEEP, SOL, front), smoothstep(0.15, 0.7, front));
+    l.colour = mix(MOSS * 1.4, mix(DEEP, SOL, front * 0.4), smoothstep(0.15, 0.7, front));
     l.alpha = mix(0.35, 1.0, front);
-    l.size = 2.3;
+    l.size = 0.34 * u_spacing;
     return l;
   }
   // Radar: pulses run outwards and a sweep brightens the dots it passes.
@@ -272,9 +275,9 @@ Look formation(int f) {
   float glow = clamp(pulse * 0.7 + sweep * 0.9, 0.0, 1.0);
   l.pos = a_rings * (1.0 + 0.012 * sin(u_time * 1.5 - radius * 6.0));
   float fade = 1.0 - smoothstep(0.35, 1.0, radius);
-  l.colour = mix(DEEP, SOL, max(glow, fade * 0.85));
-  l.alpha = a_inRings * mix(0.55, 1.0, max(glow, fade * 0.6));
-  l.size = mix(2.9, 4.0, glow);
+  l.colour = mix(DEEP, SOL, max(glow * 0.75, fade * 0.45));
+  l.alpha = a_inRings * mix(0.6, 1.0, max(glow, fade * 0.6));
+  l.size = mix(0.56, 0.68, glow) * u_spacing;
   return l;
 }
 

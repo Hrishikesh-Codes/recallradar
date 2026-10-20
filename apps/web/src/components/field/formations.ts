@@ -84,7 +84,7 @@ function cloud(count: number, next: () => number, aspect: number): Float32Array 
  * A torus seen almost edge-on: rings around the tube, so each reads as an upright ellipse and
  * together they make the wide dotted "tyre" that turns behind the how-it-works cards.
  */
-function torus(count: number, aspect: number, rings = 18): Float32Array {
+function torus(count: number, aspect: number, rings = 24): Float32Array {
   const points = new Float32Array(count * 3);
   const major = Math.min(0.62, 0.45 * aspect);
   const minor = 0.4;
@@ -110,12 +110,12 @@ function rings(
   count: number,
   aspect: number,
   next: () => number,
-  ringCount = 9,
-  spacing = 0.026,
+  ringCount = 6,
+  spacing = 0.048,
 ): { points: Float32Array; visible: Float32Array } {
   const points = new Float32Array(count * 3);
   const visible = new Float32Array(count);
-  const outer = Math.min(0.92, 0.7 * aspect);
+  const outer = Math.min(0.8, 0.62 * aspect);
   let i = 0;
   for (let k = 0; k < ringCount && i < count; k++) {
     const radius = outer * ((k + 1.5) / (ringCount + 0.5));

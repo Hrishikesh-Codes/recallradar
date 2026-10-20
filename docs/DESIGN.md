@@ -117,11 +117,13 @@ signature effect rebuilt with our own shaders and imagery:
 | Section | `data-field` | What the dots do |
 |---|---|---|
 | Hero, closing call to action | `panels` | Our procedural "imagery": domain-warped noise streaked like long exposures, graded black → ember → `accent-deep` → `accent` → sand with film grain, in a collage of hard-edged panels. Dissolves in 8px blocks into the dots as you scroll on. |
-| First statement (3 screens, pinned) | `grid` | Halftone grid (14px apart, 18px on phones): dot size and colour follow a slow image of the same noise; moss-grey dots, orange where bright; twinkle |
+| First statement (3 screens, pinned) | `grid` | Halftone grid (14px apart, 18px on phones): dot size (17–62% of the spacing) and colour follow a slow image of the same noise; moss-grey dots, red-orange where bright; twinkle |
 | Second statement (2 screens, pinned) | `cloud` | A soft ball of orange dots, slowly turning |
-| How it works | `torus` | A dotted torus seen near edge-on, 18 tube rings, turning |
-| "No recall found never means safe." | `rings` | The radar: 9 dotted rings, 12px between dots, pulses running outward and a sweep |
+| How it works | `torus` | A dotted torus seen near edge-on, 24 tube rings, turning |
+| "No recall found never means safe." | `rings` | The radar: 6 dotted rings, about 22px between dots, pulses running outward and a sweep |
 
+- **Dot sizes scale with the grid spacing**, so phones (wider spacing) get larger dots, as on the
+  reference; the palette leans red-orange (`accent-deep`), with `accent` only at the brightest.
 - **Morphing**: a section holds its formation while it covers the viewport; during its last
   screen the dots move to the next one, each starting a little later than the last (up to 30%
   of the way), so the change ripples rather than snaps.

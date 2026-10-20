@@ -1,7 +1,10 @@
 import { VERDICTS, type Verdict } from "@/components/verdict";
 import { cn } from "@/lib/cn";
 
-/** The verdict in huge uppercase display type, with an icon and an eyebrow label. */
+/**
+ * The verdict in huge uppercase display type, with an icon and an eyebrow label. The words slide
+ * up from behind a mask when it appears, like the reference's headlines.
+ */
 export function VerdictHeading({
   verdict,
   as: Heading = "h1",
@@ -18,7 +21,11 @@ export function VerdictHeading({
         <Icon className="size-5" />
         <span>Verdict</span>
       </p>
-      <Heading className="display text-verdict">{label}</Heading>
+      <Heading className="display text-verdict" data-reveal="on-load">
+        <span className="reveal-line">
+          <span className="reveal-line__inner">{label}</span>
+        </span>
+      </Heading>
       <p className="mt-4 max-w-prose text-muted-1">{meaning}</p>
     </div>
   );

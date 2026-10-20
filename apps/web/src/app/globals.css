@@ -579,6 +579,18 @@
   }
 }
 
+/* A view that replaces another (checking, the verdict) rises into place. */
+.rise-in {
+  animation: rise-in var(--dur-reveal) var(--ease-reveal) both;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+}
+
 /* "Scroll for more": the arrow's dots run downwards. */
 .scroll-cue circle {
   animation: cue-dot 1.6s var(--ease-reveal) infinite;

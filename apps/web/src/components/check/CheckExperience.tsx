@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckForm, EXAMPLES } from "@/components/check/CheckForm";
 import { Checking } from "@/components/check/Checking";
 import { VerdictView } from "@/components/check/VerdictView";
+import { cn } from "@/lib/cn";
 import { ApiError, checkProduct, type CheckInput, type CheckResponse } from "@/lib/api/client";
 import { takePendingCheck } from "@/lib/pendingCheck";
 
@@ -59,16 +60,29 @@ export function CheckExperience({ recalls }: { recalls?: number }) {
     if (state.kind !== "checking") window.scrollTo({ top: 0 });
   }, [state.kind]);
 
-  const reset = () => setState({ kind: "idle" });
+  // The form rises in only when coming back to it, not on first load (axe measures contrast
+  // straight away, and a fading form reads as low contrast).
+  const [returned, setReturned] = useState(false);
+  const reset = () => {
+    setReturned(true);
+    setState({ kind: "idle" });
+  };
 
   return (
     <div ref={heading} tabIndex={-1} className="outline-none">
-      {state.kind === "checking" ? <Checking recalls={recalls} /> : null}
+      {/* Each state rises into place as it appears (CSS, .rise-in). */}
+      {state.kind === "checking" ? (
+        <div className="rise-in">
+          <Checking recalls={recalls} />
+        </div>
+      ) : null}
       {state.kind === "done" ? (
-        <VerdictView result={state.result} input={state.input} onCheckAnother={reset} />
+        <div className="rise-in">
+          <VerdictView result={state.result} input={state.input} onCheckAnother={reset} />
+        </div>
       ) : null}
       {state.kind === "idle" || state.kind === "error" ? (
-        <div className="flex flex-col gap-12">
+        <div className={cn("flex flex-col gap-12", returned && "rise-in")}>
           {state.kind === "error" ? (
             <p role="alert" className="max-w-prose text-accent">
               {state.message}

@@ -1,8 +1,8 @@
 # Design system
 
-RecallRadar's visual language follows the design reference (boonglobal.io): warm near-black,
-sand-coloured text, "sol" orange accents, glass surfaces, nested hairline frames, and calm,
-precise motion. We match the **style**, not the site: no logo, photography, copy, icons, source
+RecallRadar's visual language follows the design reference (boonglobal.io, re-measured
+2026-10-20): warm near-black, sand-coloured text, "sol" orange accents, glass surfaces, nested
+hairline frames, a scroll-driven dot field, and calm, precise motion. We match the **style**, not the site: no logo, photography, copy, icons, source
 code, or licensed fonts are reused.
 
 Live gallery: **`/dev`** (not indexed). Source of truth: `apps/web/src/design/tokens.ts`, mirrored
@@ -62,6 +62,9 @@ Both are self-hosted by `next/font`; visitors' browsers never contact Google.
 
 - **Glass** (`.glass`): nav pills and the menu panel. `rgb(1 0 1 / 0.4)`, `blur(16px)`, 8px
   radius, no border.
+- **Plain card** (`.card-plain`): the how-it-works cards. 1px `line` border, `rgb(22 18 16 /
+  0.6)`, `blur(16px)`, 8px radius, 32px padding, 64px between icon and text; brightens to
+  `rgb(49 44 33 / 0.45)` on hover (500ms, reveal easing).
 - **Card** (`<Card>`): a card within a card. 1px `line` border, 4px padding, a 1px **dashed**
   inner frame, `rgb(49 44 33 / 0.3)`, `blur(16px)`, radii 8px and 4px. `floating` adds
   `0 10px 30px rgb(0 0 2 / 0.3)`.
@@ -87,18 +90,54 @@ Both are self-hosted by `next/font`; visitors' browsers never contact Google.
 |---|---|---|
 | Hover colour | 150ms | linear |
 | Menus, overlays, button wipe | 250ms | `cubic-bezier(0.5, 0.1, 0, 1)` |
-| Reveals, header show/hide | 500ms | `cubic-bezier(0.5, 0.1, 0, 1)` |
+| Reveals, menu height, page fade | 500ms | `cubic-bezier(0.5, 0.1, 0, 1)` |
 
 - **Line reveal** (`<LineReveal>`): each line sits in a clipped mask and slides up, staggered
   80ms. `trigger="load"` is pure CSS (works without JS); `trigger="view"` arms only content that
   starts offscreen, so nothing visible is ever hidden after hydration.
-- **Menu**: the label scrambles through block glyphs from MENU to CLOSE; the 3×3 dot icon becomes
-  an X; the glass panel fades and drops 8px, its items staggered 40ms. Escape and outside clicks
-  close it, focus moves into it on open and back to the button on close.
-- **Header**: hides while scrolling down past 120px; returns on scroll up or keyboard focus.
+- **Block reveal** (`<Reveal>`): cards and buttons fade and slide up 2rem as they enter view,
+  staggered 80ms; same arming rule as line reveals.
+- **Header** (measured on the reference): fixed 24px from the top, two 56px glass pills
+  (wordmark, MENU), always in view.
+- **Menu**: the label scrambles through block glyphs from MENU to CLOSE (≈330ms); the icon is a
+  4×3 grid of 3px dots, 3px apart, keeping the six dots of a dotted × when open. The glass panel
+  spans both pills, 8px below them, and opens by height (grid rows 0fr → 1fr, 500ms, reveal
+  easing), uppercase 12px/600 links centred. Escape and outside clicks close it; focus moves
+  into it on the first frame and back to the button on close.
+- **Page transitions**: after a client-side navigation the new page fades in (500ms, opacity
+  only, since a transform would break the field's fixed canvas). The first page of a visit
+  doesn't fade; it has its own line reveals.
 - **Smooth scroll**: Lenis, marketing pages only.
-- **Radar** (M1): a WebGL2 halftone dot field with pulse rings and a sweep, on the landing hero
-  and the "checking" state only, paused offscreen, device pixel ratio capped.
+
+## The field (landing page)
+
+One fixed WebGL2 canvas behind the landing page (`components/field/`), the reference's
+signature effect rebuilt with our own shaders and imagery:
+
+| Section | `data-field` | What the dots do |
+|---|---|---|
+| Hero, closing call to action | `panels` | Our procedural "imagery": domain-warped noise streaked like long exposures, graded black → ember → `accent-deep` → `accent` → sand with film grain, in a collage of hard-edged panels. Dissolves in 8px blocks into the dots as you scroll on. |
+| First statement (3 screens, pinned) | `grid` | Halftone grid (14px apart, 18px on phones): dot size and colour follow a slow image of the same noise; moss-grey dots, orange where bright; twinkle |
+| Second statement (2 screens, pinned) | `cloud` | A soft ball of orange dots, slowly turning |
+| How it works | `torus` | A dotted torus seen near edge-on, 18 tube rings, turning |
+| "No recall found never means safe." | `rings` | The radar: 9 dotted rings, 12px between dots, pulses running outward and a sweep |
+
+- **Morphing**: a section holds its formation while it covers the viewport; during its last
+  screen the dots move to the next one, each starting a little later than the last (up to 30%
+  of the way), so the change ripples rather than snaps.
+- **Text over the field** carries `data-field-shade` and the field darkens behind it (110px
+  falloff) to a brightness cap: ember behind display type (`="large"`, 3:1 needed), darker
+  behind body text (4.5:1). Dots dim only behind body text. Measured on the hero (worst of
+  several frames, 1440×900): headline 5.99:1 sand and 3.46:1 orange, body 11.9:1, counter
+  7.27:1; 375×812 is within 0.1. `e2e/field.spec.ts` reads the WebGL frame and enforces this.
+- **Cost**: device pixel ratio capped at 1.5 (1.25 on phones); the panels render at half
+  resolution and a composite pass adds grain at full size; the loop stops when the tab is
+  hidden.
+- **Reduced motion**: no loop and no morphing: still panels in the hero, a still grid elsewhere.
+- **Without WebGL2**: panel sections show a CSS stand-in (warm glows at the edges).
+- **Checking** (the check page): the WebGL radar sweep in a circle while a check runs, the CSS
+  sweep as its fallback. App pages have no other WebGL: their headers sit on a still CSS dot
+  matrix with an orange glow (`.page-dots`).
 
 **Reduced motion** turns transitions off entirely, plays no reveal or scramble animations, and
 disables Lenis and the radar (a static frame instead). We don't use the "0.01ms" trick: it makes

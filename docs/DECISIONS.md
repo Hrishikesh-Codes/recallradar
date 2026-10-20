@@ -37,6 +37,33 @@ why, and what it costs.
 - **NHTSA recalls are emailed too.** The CPSC-only rule came from openFDA's terms; NHTSA's data has
   no such restriction.
 
+### Design: closer to the reference
+
+- **Re-measured the reference (2026-10-20) and matched its behaviour, not just its tokens.** Its
+  colours and timings were already ours. What was missing was structure and the signature
+  effect: one WebGL canvas behind the whole page whose dots morph between formations as you
+  scroll (halftone grid, cloud, torus, rings), pinned statements with glass notes drifting past,
+  staggered cards, masked large text, and photo panels that dissolve into the dots.
+- **Our own imagery, made in the shader.** The reference's hero and closing panels are
+  photographs; the spec rules out copying them and we have none of our own, so the panels are
+  procedural (warped noise streaked like long exposures, graded in our palette with grain). No
+  image downloads, and it animates.
+- **Contrast over moving pixels is enforced, not hoped for.** The reference sets sand text over
+  bright orange areas of its photos (sand on the accent orange is 1.75:1). Text over the field marks its block, and
+  the field darkens behind it to a cap per text size; an e2e test reads the WebGL frame and
+  checks 3:1 / 4.5:1 (measured worst cases: 3.46:1 for the orange headline word, 5.99:1 sand,
+  11.9:1 body).
+- **The header stays put.** Ours hid on scroll down; the reference toggles a class but its pills
+  never move, so ours no longer hides either.
+- **Pages fade in only after a navigation.** On first load the fade made axe measure text at
+  partial opacity (13 false contrast failures per page), and the first page has its own reveals.
+- **Cost controls:** the panels render at half resolution (a quarter of the noise work), pixel
+  ratio is capped, and app screens get a still CSS dot matrix instead of WebGL (the spec keeps
+  WebGL to the landing page and the checking state, which now uses the WebGL radar).
+- **A testing trap found on the way:** Playwright serves the last production build and reuses a
+  running server, so e2e runs after source edits test old code until `pnpm build` runs. CI
+  builds first; locally, build before trusting an e2e pass.
+
 ### USDA FSIS: meat, poultry, and eggs
 
 - **Source: FSIS's Recall API** (`/fsis/api/recall/v/1`): one JSON array of every notice since

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { savePendingCheck } from "@/lib/pendingCheck";
 
 /** "Try it now" on the landing page: hands the input to /check, which runs it. */
-export function TryIt() {
+export function TryIt({ id = "try-it" }: { id?: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");
 
@@ -28,11 +28,11 @@ export function TryIt() {
 
   return (
     <form onSubmit={submit} className="flex w-full max-w-xl flex-col gap-3 sm:flex-row">
-      <label htmlFor="try-it" className="sr-only">
+      <label htmlFor={id} className="sr-only">
         Product, link, barcode digits, or VIN
       </label>
       <input
-        id="try-it"
+        id={id}
         className="field flex-1"
         placeholder="Try it: a product, a link, a barcode, or a VIN"
         value={value}

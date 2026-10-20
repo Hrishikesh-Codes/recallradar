@@ -37,6 +37,10 @@
   --text-display: clamp(2.25rem, 1.106rem + 4.883vw, 5.5rem);
   --text-display--line-height: 0.9;
   --text-display--letter-spacing: -0.027em;
+  /* Large statement: 44px at 375w -> 108px at 1440w (reference "large text"). */
+  --text-statement: clamp(2.75rem, 1.342rem + 6.009vw, 6.75rem);
+  --text-statement--line-height: 0.9;
+  --text-statement--letter-spacing: -0.03em;
   --text-verdict: clamp(3rem, 1.5rem + 6.4vw, 7.5rem);
   --text-verdict--line-height: 0.9;
   --text-verdict--letter-spacing: -0.03em;
@@ -132,6 +136,15 @@
     text-transform: uppercase;
   }
 
+  /* Statements over the field (reference: 32px, 500, 1.2, -0.02em, centred). */
+  .statement {
+    font-size: var(--text-heading);
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
   /* Floating controls: nav pills, menu panel. */
   .glass {
     background-color: rgb(1 0 1 / 0.4);
@@ -151,6 +164,23 @@
     backdrop-filter: blur(16px);
   }
 
+  /* Single-frame glass card (the reference's how-it-works cards). */
+  .card-plain {
+    padding: 2rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background-color: rgb(22 18 16 / 0.6);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    transition: background-color var(--dur-reveal) var(--ease-reveal);
+  }
+
+  @media (hover: hover) {
+    .card-plain:hover {
+      background-color: rgb(49 44 33 / 0.45);
+    }
+  }
+
   .card--floating {
     box-shadow: var(--shadow-float);
   }
@@ -162,7 +192,26 @@
     border-radius: var(--radius-sm);
   }
 
+  /*
+   * Without WebGL2 (html lacks data-field-on), panel sections get a CSS stand-in for the
+   * field's imagery: warm glows at the edges, dark where the text sits.
+   */
+  .field-panels {
+    background:
+      radial-gradient(60% 45% at 85% 20%, rgb(227 70 8 / 0.55), transparent 70%),
+      radial-gradient(45% 40% at 10% 90%, rgb(255 157 0 / 0.35), transparent 70%),
+      radial-gradient(50% 50% at 70% 95%, rgb(227 70 8 / 0.4), transparent 70%), var(--color-bg-0);
+  }
+
+  :root[data-field-on] .field-panels {
+    background: none;
+  }
+
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .card-plain {
+      background-color: var(--color-bg-1);
+    }
+
     .glass {
       background-color: rgb(22 18 16 / 0.96);
     }
@@ -472,6 +521,103 @@
   [data-reveal="on-load"] .reveal-line__inner {
     animation: reveal-line-up var(--dur-reveal) var(--ease-reveal) both;
     animation-delay: calc(150ms + var(--line-index, 0) * 80ms);
+  }
+}
+
+/* Each page fades in, as on the reference (opacity only: a transform would break the field's
+   position: fixed canvas). */
+.page-enter {
+  animation: page-enter var(--dur-reveal) var(--ease-reveal) both;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+/* "Scroll for more": the arrow's dots run downwards. */
+.scroll-cue circle {
+  animation: cue-dot 1.6s var(--ease-reveal) infinite;
+}
+
+.scroll-cue circle:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.scroll-cue circle:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.scroll-cue circle:nth-child(n + 4) {
+  animation-delay: 0.3s;
+}
+
+@keyframes cue-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* How-it-works icons (StepIcons.tsx). */
+.step-icon__spin {
+  transform-origin: 44px 44px;
+  animation: radar-spin 24s linear infinite;
+}
+
+.step-icon__meridian {
+  transform-origin: 44px 44px;
+  animation: meridian 6s linear infinite;
+}
+
+.step-icon__meridian--late {
+  animation-delay: -3s;
+}
+
+.step-icon__pulse {
+  transform-origin: 44px 44px;
+  animation: ring-pulse 2.4s var(--ease-reveal) infinite;
+}
+
+.step-icon__orbit {
+  transform-origin: 0 0;
+  animation: radar-spin 7s linear infinite;
+}
+
+.step-icon__blink {
+  animation: blink 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes meridian {
+  0% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(-1);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes ring-pulse {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.35);
+    opacity: 0;
+  }
+}
+
+@keyframes blink {
+  to {
+    opacity: 0.25;
   }
 }
 

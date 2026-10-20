@@ -8,7 +8,7 @@ import { TextLink } from "@/components/ui/Button";
 /** Footer in the reference's nested-frame style: frame > panel grid > bordered tiles. */
 export function SiteFooter() {
   return (
-    <footer>
+    <footer className="relative z-[1] bg-bg-0">
       <Frame className="min-h-[25vh]">
         <div className="frame__panel mx-4 my-16 grid gap-2 rounded-lg p-2 sm:mx-[clamp(1rem,7.5vw,6rem)] md:grid-cols-[2fr_2fr_1fr] md:grid-rows-[auto_auto]">
           <nav aria-label="Footer" className="frame__panel md:row-span-2">

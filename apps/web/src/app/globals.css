@@ -551,6 +551,20 @@
     animation: reveal-line-up var(--dur-reveal) var(--ease-reveal) both;
     animation-delay: calc(150ms + var(--line-index, 0) * 80ms);
   }
+
+  /* Block reveal (Reveal.tsx): fades and slides up 2rem, staggered 80ms. */
+  .reveal-block[data-reveal-block="in"] {
+    transition:
+      opacity var(--dur-reveal) var(--ease-reveal),
+      transform var(--dur-reveal) var(--ease-reveal),
+      background-color var(--dur-reveal) var(--ease-reveal);
+    transition-delay: calc(var(--reveal-index, 0) * 80ms);
+  }
+
+  .reveal-block[data-reveal-block="armed"] {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
 }
 
 /* Each page fades in, as on the reference (opacity only: a transform would break the field's

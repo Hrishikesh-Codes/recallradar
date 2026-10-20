@@ -15,6 +15,14 @@ test.describe("reduced motion", () => {
     await expect(page.locator("html")).not.toHaveClass(/lenis/);
   });
 
+  test("cards are never hidden for a reveal", async ({ page }) => {
+    await page.goto("/");
+    const card = page.getByRole("listitem").filter({ hasText: "We keep watching" });
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toBeVisible();
+    await expect(card).not.toHaveAttribute("data-reveal-block", "armed");
+  });
+
   test("scroll reveals never hide content", async ({ page }) => {
     await page.goto("/");
     const statement = page.getByRole("heading", { name: /we checked/i });
@@ -32,6 +40,14 @@ test.describe("full motion", () => {
   test("smooth scrolling runs on marketing pages", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("html")).toHaveClass(/lenis/);
+  });
+
+  test("how-it-works cards slide in when scrolled into view", async ({ page }) => {
+    await page.goto("/");
+    const card = page.getByRole("listitem").filter({ hasText: "We keep watching" });
+    await expect(card).toHaveAttribute("data-reveal-block", "armed");
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toHaveAttribute("data-reveal-block", "in");
   });
 
   test("offscreen statements reveal when scrolled into view", async ({ page }) => {

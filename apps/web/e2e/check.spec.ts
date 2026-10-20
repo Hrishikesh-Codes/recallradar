@@ -123,8 +123,13 @@ test("type a product and get a verdict with its evidence", async ({ page }) => {
 test("Try it now on the home page runs the check on /check", async ({ page }) => {
   const api = await mockApi(page);
   await page.goto("/");
-  await page.getByLabel("Product, link, barcode digits, or VIN").fill("Peloton bike PL01");
-  await page.getByRole("button", { name: "Check", exact: true }).click();
+  // The hero's form (the page ends with a second one).
+  const field = page.getByLabel("Product, link, barcode digits, or VIN");
+  await field.fill("Peloton bike PL01");
+  await page
+    .locator("form", { has: field })
+    .getByRole("button", { name: "Check", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/check$/);
   await expect(page.getByRole("heading", { level: 2, name: "Recalled" })).toBeVisible();
   // The product text travels in session storage, never in the URL.

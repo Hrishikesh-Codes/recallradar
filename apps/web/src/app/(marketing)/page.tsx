@@ -6,6 +6,7 @@ import { CheckStepIcon, ScanStepIcon, WatchStepIcon } from "@/components/home/St
 import { StickyStatement, type Note } from "@/components/home/StickyStatement";
 import { TryIt } from "@/components/home/TryIt";
 import { LineReveal } from "@/components/motion/LineReveal";
+import { Reveal } from "@/components/motion/Reveal";
 import { ButtonLink } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 
@@ -127,9 +128,9 @@ export default function HomePage() {
             sentence="Every answer shows its evidence, so you know what matched, what to check, and what to do next."
           />
         </h2>
-        <ButtonLink href="/#how-it-works" className="mt-10">
-          How it works
-        </ButtonLink>
+        <Reveal className="mt-10">
+          <ButtonLink href="/#how-it-works">How it works</ButtonLink>
+        </Reveal>
       </StickyStatement>
 
       <section
@@ -142,8 +143,10 @@ export default function HomePage() {
         </h2>
         <ol className="mx-auto grid w-full max-w-[66rem] gap-4 md:grid-cols-3">
           {STEPS.map(({ Icon, title, body }, index) => (
-            <li
+            <Reveal
+              as="li"
               key={title}
+              index={index}
               className={cn(
                 "card-plain flex flex-col gap-16",
                 index === 1 && "md:translate-y-12",
@@ -157,7 +160,7 @@ export default function HomePage() {
                 </h3>
                 <p className="text-khaki">{body}</p>
               </div>
-            </li>
+            </Reveal>
           ))}
         </ol>
       </section>
@@ -192,7 +195,9 @@ export default function HomePage() {
             className="statement"
             lines={["Check something you own.", "It takes a few seconds."]}
           />
-          <TryIt id="try-it-again" />
+          <Reveal className="w-full">
+            <TryIt id="try-it-again" label="Something you own: product, link, barcode, or VIN" />
+          </Reveal>
         </div>
       </section>
     </>

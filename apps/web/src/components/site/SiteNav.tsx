@@ -69,8 +69,12 @@ export function SiteNav() {
         <div
           className={cn(
             "absolute inset-x-0 top-[calc(100%+0.5rem)] grid",
-            "transition-[grid-template-rows,visibility] duration-(--dur-reveal) ease-reveal",
-            open ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]",
+            "duration-(--dur-reveal) ease-reveal",
+            // Visibility switches at once on opening (focus moves in on the first frame) and
+            // only after the close animation.
+            open
+              ? "visible grid-rows-[1fr] transition-[grid-template-rows]"
+              : "invisible grid-rows-[0fr] transition-[grid-template-rows,visibility]",
           )}
         >
           <nav

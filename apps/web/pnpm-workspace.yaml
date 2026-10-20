@@ -1,3 +1,5 @@
 allowBuilds:
   sharp: false
+  # Its install script only prints a donation message.
+  tesseract.js: false
   unrs-resolver: false

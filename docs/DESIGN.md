@@ -62,9 +62,9 @@ Both are self-hosted by `next/font`; visitors' browsers never contact Google.
 
 - **Glass** (`.glass`): nav pills and the menu panel. `rgb(1 0 1 / 0.4)`, `blur(16px)`, 8px
   radius, no border.
-- **Plain card** (`.card-plain`): the how-it-works cards. 1px `line` border, `rgb(22 18 16 /
-  0.6)`, `blur(16px)`, 8px radius, 32px padding, 64px between icon and text; brightens to
-  `rgb(49 44 33 / 0.45)` on hover (500ms, reveal easing).
+- **No boxes over the field.** On the landing page the drifting notes are plain sand text under
+  a 2rem orange rule, and the how-it-works steps are open columns (icon, heading, text); the
+  dots dim behind them instead of a glass box hiding the field (owner's call, 2026-10-21).
 - **Card** (`<Card>`): a card within a card. 1px `line` border, 4px padding, a 1px **dashed**
   inner frame, `rgb(49 44 33 / 0.3)`, `blur(16px)`, radii 8px and 4px. `floating` adds
   `0 10px 30px rgb(0 0 2 / 0.3)`.
@@ -129,9 +129,11 @@ signature effect rebuilt with our own shaders and imagery:
   of the way), so the change ripples rather than snaps.
 - **Text over the field** carries `data-field-shade` and the field darkens behind it (110px
   falloff) to a brightness cap: ember behind display type (`="large"`, 3:1 needed), darker
-  behind body text (4.5:1). Dots dim only behind body text. Measured on the hero (worst of
+  behind body text (4.5:1). Dots dim only behind body text, to 12% (overlapping torus dots add
+  up, and 35% left the middle step at 3.30:1). Measured on the hero (worst of
   several frames, 1440×900): headline 5.99:1 sand and 3.46:1 orange, body 11.9:1, counter
-  7.27:1; 375×812 is within 0.1. `e2e/field.spec.ts` reads the WebGL frame and enforces this.
+  7.27:1; 375×812 is within 0.1. `e2e/field.spec.ts` reads the WebGL frame and enforces this for the hero, a note, and the
+  steps.
 - **Cost**: device pixel ratio capped at 1.5 (1.25 on phones); the panels render at half
   resolution and a composite pass adds grain at full size; the loop stops when the tab is
   hidden.

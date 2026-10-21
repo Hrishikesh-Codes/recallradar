@@ -79,7 +79,7 @@ export default function HomePage() {
             lines={[
               "Know if what",
               "you own was",
-              <span key="recalled" className="ml-[0.6em] inline-block text-accent">
+              <span key="recalled" className="text-accent">
                 recalled
               </span>,
             ]}
@@ -141,24 +141,21 @@ export default function HomePage() {
         <h2 className="text-center text-label font-medium tracking-normal text-muted-2 uppercase">
           How it works
         </h2>
-        <ol className="mx-auto grid w-full max-w-[66rem] gap-4 md:grid-cols-3">
+        {/* Open columns over the torus, no boxes: the dots dim behind the text instead. */}
+        <ol className="mx-auto grid w-full max-w-[66rem] gap-14 md:grid-cols-3 md:gap-12">
           {STEPS.map(({ Icon, title, body }, index) => (
             <Reveal
               as="li"
               key={title}
               index={index}
-              className={cn(
-                "card-plain flex flex-col gap-16",
-                index === 1 && "md:translate-y-12",
-                index === 2 && "md:translate-y-24",
-              )}
+              className={cn(index === 1 && "md:translate-y-12", index === 2 && "md:translate-y-24")}
             >
-              <Icon className="size-[5.5rem] text-accent" />
-              <div>
-                <h3 className="mb-4 text-[1.125rem] leading-[1.2] font-medium tracking-[-0.02em]">
-                  {title}
-                </h3>
-                <p className="text-khaki">{body}</p>
+              <div data-field-shade className="flex flex-col gap-8">
+                <Icon className="size-[5.5rem] text-accent" />
+                <div>
+                  <h3 className="mb-3 text-heading font-medium">{title}</h3>
+                  <p className="text-khaki">{body}</p>
+                </div>
               </div>
             </Reveal>
           ))}

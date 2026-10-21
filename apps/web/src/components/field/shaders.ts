@@ -308,7 +308,8 @@ void main() {
 
   vec2 px = vec2(clip.x * 0.5 + 0.5, 0.5 - clip.y * 0.5) * u_res;
   v_colour = mix(a.colour, b.colour, t);
-  v_alpha = mix(a.alpha, b.alpha, t) * (1.0 - 0.65 * bodyShadeAt(px));
+  // Overlapping dots add up (the torus is dense), so they dim hard behind body text.
+  v_alpha = mix(a.alpha, b.alpha, t) * (1.0 - 0.88 * bodyShadeAt(px));
   gl_PointSize = mix(a.size, b.size, t) * perspective * u_dpr;
 }`;
 

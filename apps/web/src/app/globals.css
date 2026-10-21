@@ -164,23 +164,6 @@
     backdrop-filter: blur(16px);
   }
 
-  /* Single-frame glass card (the reference's how-it-works cards). */
-  .card-plain {
-    padding: 2rem;
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-md);
-    background-color: rgb(22 18 16 / 0.6);
-    -webkit-backdrop-filter: blur(16px);
-    backdrop-filter: blur(16px);
-    transition: background-color var(--dur-reveal) var(--ease-reveal);
-  }
-
-  @media (hover: hover) {
-    .card-plain:hover {
-      background-color: rgb(49 44 33 / 0.45);
-    }
-  }
-
   .card--floating {
     box-shadow: var(--shadow-float);
   }
@@ -208,10 +191,6 @@
   }
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .card-plain {
-      background-color: var(--color-bg-1);
-    }
-
     .glass {
       background-color: rgb(22 18 16 / 0.96);
     }

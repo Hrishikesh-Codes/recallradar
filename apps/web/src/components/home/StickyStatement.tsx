@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 
 import type { Formation } from "@/components/field/formations";
-import { Card } from "@/components/ui/Card";
+import { Reveal } from "@/components/motion/Reveal";
 import { cn } from "@/lib/cn";
 
 export type Note = { text: string; side: "left" | "right"; at: number };
 
 /**
  * A statement pinned in the middle of the screen while the section scrolls past, as on the
- * reference: the section is several screens tall, the statement sticks, and small glass notes
- * drift up past it. `at` places a note down the section (0–1).
+ * reference: the section is several screens tall, the statement sticks, and short notes drift
+ * up past it. The notes are plain text under a short orange rule (no boxes); they fade up as
+ * they arrive and the dots dim behind them. `at` places a note down the section (0–1).
  */
 export function StickyStatement({
   field,
@@ -45,9 +46,12 @@ export function StickyStatement({
               )}
               style={{ top: `${note.at * 100}%` }}
             >
-              <Card innerClassName="px-4 py-3.5 text-[0.8125rem] leading-[1.45] text-muted-1">
-                {note.text}
-              </Card>
+              <Reveal>
+                <div data-field-shade>
+                  <span aria-hidden className="mb-4 block h-px w-8 bg-accent" />
+                  <p className="text-text">{note.text}</p>
+                </div>
+              </Reveal>
             </li>
           ))}
         </ul>

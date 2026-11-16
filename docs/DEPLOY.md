@@ -6,7 +6,7 @@ values the next one needs. Secrets go only into each service's settings, never i
 | Piece | Service | Free plan limits that matter |
 |---|---|---|
 | Database | Neon (two projects) | 512 MiB per database (branch), 100 CU-hours/month per project, scales to zero after 5 minutes |
-| API | Oracle Cloud Always Free (Ampere A1 VM) | 4 ARM cores and 24 GB in total; always on. Sign-up verifies a card; Always Free resources aren't charged |
+| API | Render (free web service) | 512 MB, 0.1 CPU; stops after 15 idle minutes (kept awake by the uptime workflow); 750 instance hours a month; no card. Alternative: an Oracle Cloud Always Free VM (§3b) |
 | Web | Vercel (Hobby) | Non-commercial use |
 | Email | Resend | 3,000 emails/month, 100/day; needs a verified domain |
 | Schedule | GitHub Actions | Free for public repos |
@@ -34,13 +34,20 @@ recalls in one (368 MB measured), product embeddings with their vector index in 
    scripts/seed-database.sh --replace postgresql://recallradar:recallradar@localhost:5432/recallradar "<recalls direct URL>" "<vectors direct URL>"
    ```
 
-5. USDA FSIS blocks scripted downloads, so meat recalls aren't in the seed. Import them from a
-   machine that can reach Neon, with a copy of FSIS's API response saved from a browser:
+5. USDA FSIS blocks scripted downloads, so meat recalls aren't in the seed. Save
+   https://www.fsis.usda.gov/fsis/api/recall/v/1 from a browser as `fsis.json`, keep it as an
+   asset of a **draft** release (private: the raw file names company contacts), and run the
+   import workflow. Repeat monthly, or when FSIS announces a recall:
 
    ```bash
-   DATABASE_URL="<recalls direct URL>" uv run recallradar-sync --source fsis --mode backfill --file fsis.json
-   DATABASE_URL="<recalls direct URL>" VECTOR_DATABASE_URL="<vectors direct URL>" uv run recallradar-embed
+   gh release upload fsis-data fsis.json --clobber
    ```
+
+   ```bash
+   gh workflow run fsis-import.yml
+   ```
+
+   (First time: `gh release create fsis-data --draft --title "FSIS data" --notes "Private." fsis.json`.)
 
 ## 2. Email (Resend)
 
@@ -50,7 +57,44 @@ recalls in one (368 MB measured), product embeddings with their vector index in 
 4. Pick the sender addresses, e.g. `RecallRadar <alerts@your-domain>` and
    `RecallRadar <sign-in@your-domain>`.
 
-## 3. API (Oracle Cloud Always Free VM)
+## 3. API (Render, free web service)
+
+Render builds the root `Dockerfile` from the public repository and runs it on its free plan:
+no card, 512 MB and a tenth of a CPU. Measured under those limits locally (`docker run
+--memory=512m --cpus=0.1`): 26 s cold start, 190–240 MB of memory, single checks in 0.1–1.1 s,
+about one check a second under load.
+
+1. Sign in at dashboard.render.com with GitHub, then `brew install render && render login`.
+2. Create the service (values come from a private file, never the command history):
+
+   ```bash
+   render services create --name recallradar-api --type web_service --runtime docker \
+     --repo https://github.com/Hrishikesh-Codes/recallradar --branch main --plan free \
+     --region virginia --health-check-path /healthz --auto-deploy=false \
+     --env-var ENVIRONMENT=production --env-var CLIENT_IP_HEADER=CF-Connecting-IP \
+     --env-var "DATABASE_URL=<recalls direct URL>" \
+     --env-var "VECTOR_DATABASE_URL=<vectors direct URL>" \
+     --env-var "API_TOKEN_SECRET=<shared with the web app>" \
+     --env-var "CORS_ORIGINS=https://<site>" --output json
+   ```
+
+   | Name | Value |
+   |---|---|
+   | `DATABASE_URL`, `VECTOR_DATABASE_URL` | the **direct** URLs: one long-lived instance keeps its own small pool, and psycopg's prepared statements don't go through PgBouncer's transaction mode reliably |
+   | `CLIENT_IP_HEADER` | `CF-Connecting-IP`: Render sits behind Cloudflare, which overwrites this header; `X-Forwarded-For` there starts with whatever the caller sent |
+   | `API_TOKEN_SECRET` | `openssl rand -hex 32` (the web app gets the same value) |
+   | `CORS_ORIGINS` | the site's URL(s), comma-separated |
+
+   The health check is `/healthz`, which never touches the database: `/readyz` would keep
+   Neon's compute awake around the clock and burn its monthly hours.
+3. Check `https://<name>.onrender.com/readyz` returns `{"status":"ok","database":true}`.
+4. Deploys: `render deploys create <service id> --wait`, or let GitHub do it after CI passes:
+   copy the service's *Settings → Deploy Hook* URL into the repository secret
+   `RENDER_DEPLOY_HOOK_URL` (`.github/workflows/deploy.yml` migrates the database first).
+5. Set the repository variables `API_URL` and `WEB_URL`: the uptime workflow then checks both
+   every ten minutes, which also keeps the service from sleeping.
+
+## 3b. Alternative: API on an Oracle Cloud Always Free VM
 
 The API runs in Docker behind Caddy, which gets and renews the HTTPS certificate. The VM deploys
 itself: every 10 minutes it checks `main` and deploys the newest commit whose CI run passed
@@ -124,6 +168,10 @@ In the repo's Actions settings:
 |---|---|---|
 | `DATABASE_URL` | secret | the recalls project's **direct** URL |
 | `VECTOR_DATABASE_URL` | secret | the vectors project's **direct** URL |
+| `VAPID_PRIVATE_KEY` | secret | Web Push private key (the web app has the public half) |
+| `RENDER_DEPLOY_HOOK_URL` | secret | optional: deploys the API after CI passes |
+| `VAPID_SUBJECT` | variable | `mailto:` the alerts sender |
+| `API_URL` | variable | the API's public URL (uptime check, daily smoke test) |
 | `SMTP_URL` | secret | the Resend SMTP URL |
 | `OPENFDA_API_KEY` | secret | optional; raises openFDA's limit to 120,000 requests/day |
 | `SENTRY_DSN` | secret | optional |

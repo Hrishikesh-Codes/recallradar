@@ -3,6 +3,57 @@
 A short log of design decisions and why. Newest milestone first; each entry says what was decided,
 why, and what it costs.
 
+## M6 — Launch (from 2026-11-16)
+
+### Hosting the API: Render's free plan
+
+- **Render instead of the Oracle VM, for now.** Oracle's Always Free tier needs a card to sign
+  up; Render's free web service doesn't, and builds the root `Dockerfile` from the public repo.
+  The Oracle files stay in `deploy/oracle/` as the upgrade path.
+- **It fits, measured.** The image run locally under Render's limits (`--memory=512m
+  --cpus=0.1`, full dataset): cold start 26 s; 189 MiB idle, 241 MiB after 16 checks; single
+  checks 0.09–1.14 s. Eight at once: all succeed, mean 6.4 s, about 1.1 checks a second (CPU
+  bound). Good for a demo; a traffic spike would queue.
+- **Sleep.** Render stops a free service after 15 idle minutes. `uptime.yml` requests
+  `/healthz` every ten minutes (it doubles as the uptime alert), the landing and check pages
+  pre-warm the API on load, and a check that runs past 5 s says the service is waking and
+  retries for up to 90 s. GitHub's schedule can run late, so the waking state is the guarantee.
+- **The health check never touches the database.** Polling `/readyz` would keep Neon's compute
+  awake all month (0.25 CU × 730 h is more than the free 100 CU-hours).
+- **Client addresses come from `CF-Connecting-IP`** (`CLIENT_IP_HEADER`). Render is behind
+  Cloudflare, which overwrites that header; `X-Forwarded-For` keeps a caller-supplied first
+  entry, which would let anyone dodge the rate limits.
+- **Direct database URLs for the API, pooled for the web app.** One long-lived API instance has
+  its own small pool and uses prepared statements; the serverless web functions open many
+  short connections.
+- **Deploys:** `deploy.yml` runs after CI passes on main: it migrates the production database,
+  then calls Render's deploy hook if one is configured. Vercel builds the web app on every push.
+
+### Security before going public
+
+- **Next.js 16.4.0 → 16.4.6 and nodemailer 10.0.13 → 10.6.0.** The production build refused to
+  run: 16.4.0 has two critical remote-code-execution advisories (GHSA-2464-fhr4-w9xw,
+  GHSA-673q-mjm6-r5xr). nodemailer's were address-parsing bugs, which matter when sign-in links
+  go to typed addresses; the recipient is now passed as a structured address too. CI runs
+  `pnpm audit --prod --audit-level high`.
+- **Security headers** on production builds: a CSP limited to this origin and the API
+  (`'unsafe-inline'` scripts because per-request nonces would make the static landing page
+  dynamic; `'wasm-unsafe-eval'` and blob workers for the barcode reader and OCR),
+  `frame-ancestors 'none'`, HSTS, `nosniff`, and a permissions policy that allows only the
+  camera. The e2e suite runs against that build, so the policy is tested with OCR and WebGL.
+
+### Operations
+
+- **Push alerts could never have been sent:** the daily job didn't receive the VAPID key. It
+  does now, with production keys.
+- **FSIS in production** goes through `fsis-import.yml` and a browser-saved file kept in a draft
+  release: 1,139 notices / 1,878 products imported on 2026-11-16 (file saved 2026-10-15).
+- **Storage is watched daily:** `recallradar-storage` fails the sync above 430 MB
+  (`pg_database_size`; Neon counts about 10% more against its 512 MiB cap). On 2026-11-16: main
+  391 MB, vectors 169 MB. Main grew from 362 MB on 2026-10-20, about 10 MB of it FSIS.
+- **The field starts when the browser is idle** and lowers its pixel ratio when frames average
+  slower than 24 ms, so slow phones keep the effect at lower resolution.
+
 ## M2 — Full coverage (in progress, from 2026-10-15)
 
 ### NHTSA: vehicles, car seats, tires, equipment

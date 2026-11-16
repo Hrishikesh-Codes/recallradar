@@ -206,6 +206,8 @@ function startField(
       "u_res",
       "u_camera",
       "u_spacing",
+      "u_pass",
+      "u_premultiplied",
       "u_shade",
       "u_shadeCap",
       "u_shades",
@@ -369,7 +371,17 @@ function startField(
       gl.uniform4fv(qu.u_shade!, shades);
       gl.uniform1fv(qu.u_shadeCap!, caps);
       gl.uniform1i(qu.u_shades!, nShades);
+      gl.uniform1i(qu.u_pass!, 0);
+      gl.uniform1i(qu.u_premultiplied!, 0);
       gl.drawArrays(gl.POINTS, 0, count);
+      // Behind body text: faint dots that can't add up (see the vertex shader).
+      if (caps.subarray(0, nShades).some((cap) => cap < 0.4)) {
+        gl.uniform1i(qu.u_pass!, 1);
+        gl.uniform1i(qu.u_premultiplied!, 1);
+        gl.blendEquation(gl.MAX);
+        gl.drawArrays(gl.POINTS, 0, count);
+        gl.blendEquation(gl.FUNC_ADD);
+      }
     }
   };
 

@@ -129,8 +129,11 @@ signature effect rebuilt with our own shaders and imagery:
   of the way), so the change ripples rather than snaps.
 - **Text over the field** carries `data-field-shade` and the field darkens behind it (110px
   falloff) to a brightness cap: ember behind display type (`="large"`, 3:1 needed), darker
-  behind body text (4.5:1). Dots dim only behind body text, to 12% (overlapping torus dots add
-  up, and 35% left the middle step at 3.30:1). Measured on the hero (worst of
+  behind body text (4.5:1). Dots behind body text are drawn in a second pass at 16% with MAX
+  blending, so overlapping dots can't add up: plain dimming (to 35%, then 12%) still failed
+  whenever the turning torus bunched dozens of dots behind the middle step, and removing them
+  left holes that read as boxes. The brightest pixel behind body text is now 16% of a dot's
+  colour, over 10:1 for the text, whatever the field is doing. Measured on the hero (worst of
   several frames, 1440×900): headline 5.99:1 sand and 3.46:1 orange, body 11.9:1, counter
   7.27:1; 375×812 is within 0.1. `e2e/field.spec.ts` reads the WebGL frame and enforces this for the hero, a note, and the
   steps.

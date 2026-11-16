@@ -86,12 +86,16 @@ float shadeAt(vec2 px) {
   return s;
 }
 
-// Dots only dim behind body text; display type is large enough to sit on them.
-float bodyShadeAt(vec2 px) {
+// Where dots need care: 1 inside a body-text block, fading to 0 within 36 CSS px of it.
+// (Display type is large enough to sit on the dots as they are.)
+float bodyZoneAt(vec2 px) {
   float s = 0.0;
   for (int i = 0; i < ${MAX_SHADES}; i++) {
     if (i >= u_shades) break;
-    if (u_shadeCap[i] < 0.4) s = max(s, shadeWeight(u_shade[i], px));
+    if (u_shadeCap[i] >= 0.4) continue;
+    vec4 r = u_shade[i];
+    vec2 d = max(max(r.xy - px, px - (r.xy + r.zw)), 0.0);
+    s = max(s, 1.0 - smoothstep(0.0, 36.0 * u_dpr, length(d)));
   }
   return s;
 }
@@ -224,6 +228,7 @@ uniform float u_aspect;
 uniform vec2 u_res;
 uniform float u_camera;
 uniform float u_spacing;      // grid spacing, CSS px (dot sizes scale with it)
+uniform int u_pass;           // 0: everywhere but body text; 1: behind body text (MAX blend)
 out vec3 v_colour;
 out float v_alpha;
 ${COLOURS}
@@ -308,8 +313,14 @@ void main() {
 
   vec2 px = vec2(clip.x * 0.5 + 0.5, 0.5 - clip.y * 0.5) * u_res;
   v_colour = mix(a.colour, b.colour, t);
-  // Overlapping dots add up (the torus is dense), so they dim hard behind body text.
-  v_alpha = mix(a.alpha, b.alpha, t) * (1.0 - 0.88 * bodyShadeAt(px));
+  // Two passes keep body text readable without punching holes in the field. Pass 0 (normal
+  // blending) leaves the text blocks out. Pass 1 draws only the dots behind them, at 16%, with
+  // MAX blending: overlapping dots can't add up there, however densely the torus bunches, so
+  // the brightest pixel behind body text is 16% of a dot's colour (over 10:1 for the text).
+  float zone = bodyZoneAt(px);
+  float alpha = mix(a.alpha, b.alpha, t);
+  v_alpha = u_pass == 0 ? alpha * (1.0 - zone) : alpha * zone * 0.16;
+  if (v_alpha <= 0.002) gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // nothing to draw: clip it
   gl_PointSize = mix(a.size, b.size, t) * perspective * u_dpr;
 }`;
 
@@ -317,10 +328,11 @@ export const POINTS_FRAGMENT = /* glsl */ `#version 300 es
 precision highp float;
 in vec3 v_colour;
 in float v_alpha;
+uniform bool u_premultiplied; // pass 1 (MAX blending ignores alpha factors)
 out vec4 colour;
 void main() {
   float d = length(gl_PointCoord - 0.5);
   float a = v_alpha * (1.0 - smoothstep(0.32, 0.5, d));
   if (a <= 0.002) discard;
-  colour = vec4(v_colour, a);
+  colour = u_premultiplied ? vec4(v_colour * a, 1.0) : vec4(v_colour, a);
 }`;

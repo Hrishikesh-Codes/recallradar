@@ -53,6 +53,11 @@ why, and what it costs.
   391 MB, vectors 169 MB. Main grew from 362 MB on 2026-10-20, about 10 MB of it FSIS.
 - **The field starts when the browser is idle** and lowers its pixel ratio when frames average
   slower than 24 ms, so slow phones keep the effect at lower resolution.
+- **Shaders compile in the background** (`KHR_parallel_shader_compile`, polled). Asking for the
+  link status straight away blocked the main thread for 2 s under Lighthouse's mobile throttle.
+  Lighthouse on the production build, local, software WebGL (2026-11-16): landing performance
+  72 → 100, total blocking time 1,940 ms → 10–20 ms, LCP 0.9 s, CLS 0; `/check` 100;
+  accessibility and SEO 100 on both. Real-GPU and real-phone numbers come after deploy.
 
 ## M2 — Full coverage (in progress, from 2026-10-15)
 

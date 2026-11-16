@@ -34,25 +34,66 @@ import {
 const MAX_DPR = 1.5;
 const SLOW_FRAME_MS = 24;
 
-function compile(gl: WebGL2RenderingContext, vertex: string, fragment: string) {
+type Programs = { panels: WebGLProgram; points: WebGLProgram; composite: WebGLProgram };
+
+/** Compile and link without asking for the result, so the driver can work in the background. */
+function build(gl: WebGL2RenderingContext, vertex: string, fragment: string): WebGLProgram {
   const program = gl.createProgram();
   for (const [type, source] of [
     [gl.VERTEX_SHADER, vertex],
     [gl.FRAGMENT_SHADER, fragment],
   ] as const) {
-    const shader = gl.createShader(type);
-    if (!shader) return null;
+    const shader = gl.createShader(type)!;
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      console.warn("Field shader failed to compile", gl.getShaderInfoLog(shader));
-      return null;
-    }
     gl.attachShader(program, shader);
-    gl.deleteShader(shader);
   }
   gl.linkProgram(program);
-  return gl.getProgramParameter(program, gl.LINK_STATUS) ? program : null;
+  return program;
+}
+
+/**
+ * The three shader programs, compiled off the main thread where the browser allows it
+ * (KHR_parallel_shader_compile: asking for a link status blocks until the compile is done,
+ * which was a 2 s main-thread task on a throttled CPU; polling for completion doesn't).
+ */
+async function compilePrograms(
+  gl: WebGL2RenderingContext,
+  cancelled: () => boolean,
+): Promise<Programs | null> {
+  const programs: Programs = {
+    panels: build(gl, FULLSCREEN_VERTEX, PANELS_FRAGMENT),
+    points: build(gl, POINTS_VERTEX, POINTS_FRAGMENT),
+    composite: build(gl, FULLSCREEN_VERTEX, COMPOSITE_FRAGMENT),
+  };
+  const all = Object.values(programs);
+  const parallel = gl.getExtension("KHR_parallel_shader_compile");
+  if (parallel) {
+    const deadline = performance.now() + 15_000;
+    while (
+      !all.every((program) => gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR))
+    ) {
+      if (cancelled() || performance.now() > deadline) return null;
+      await new Promise((resolve) => window.setTimeout(resolve, 40));
+    }
+  }
+  if (cancelled()) return null;
+  for (const program of all) {
+    if (gl.getProgramParameter(program, gl.LINK_STATUS)) continue;
+    const logs = (gl.getAttachedShaders(program) ?? []).map((shader) =>
+      gl.getShaderInfoLog(shader),
+    );
+    console.warn("Field shader failed to compile", gl.getProgramInfoLog(program), ...logs);
+    return null;
+  }
+  // Linked programs keep what they need; the shader objects can go.
+  for (const program of all) {
+    for (const shader of gl.getAttachedShaders(program) ?? []) {
+      gl.detachShader(program, shader);
+      gl.deleteShader(shader);
+    }
+  }
+  return programs;
 }
 
 function weights(formation: Formation): number[] {
@@ -73,15 +114,12 @@ function readSections(): (Section & { element: HTMLElement })[] {
   );
 }
 
-/** Compile, build and start the field on `canvas`; returns its teardown (or nothing: no WebGL2). */
-function startField(canvas: HTMLCanvasElement): (() => void) | undefined {
-  const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false });
-  if (!gl) return;
-  const panels = compile(gl, FULLSCREEN_VERTEX, PANELS_FRAGMENT);
-  const points = compile(gl, POINTS_VERTEX, POINTS_FRAGMENT);
-  const composite = compile(gl, FULLSCREEN_VERTEX, COMPOSITE_FRAGMENT);
-  if (!panels || !points || !composite) return;
-
+/** Build the buffers and start drawing on `canvas`; returns the teardown. */
+function startField(
+  canvas: HTMLCanvasElement,
+  gl: WebGL2RenderingContext,
+  { panels, points, composite }: Programs,
+): () => void {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const root = document.documentElement;
   root.dataset.fieldOn = "";
@@ -407,13 +445,18 @@ export function DotField() {
     // Start once the browser is idle, so compiling shaders never delays the first paint or the
     // headline (the page's largest element); the CSS stand-in shows until then.
     let stop: (() => void) | undefined;
-    const start = () => {
-      stop = startField(canvas);
+    let cancelled = false;
+    const start = async () => {
+      const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false });
+      if (!gl) return; // no WebGL2: the CSS stand-in stays
+      const programs = await compilePrograms(gl, () => cancelled);
+      if (programs && !cancelled) stop = startField(canvas, gl, programs);
     };
     const idle = window.requestIdleCallback
-      ? window.requestIdleCallback(start, { timeout: 600 })
-      : window.setTimeout(start, 1);
+      ? window.requestIdleCallback(() => void start(), { timeout: 600 })
+      : window.setTimeout(() => void start(), 1);
     return () => {
+      cancelled = true;
       if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
       window.clearTimeout(idle);
       stop?.();

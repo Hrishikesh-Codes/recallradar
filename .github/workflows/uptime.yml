@@ -1,0 +1,40 @@
+name: Uptime
+
+# Every ten minutes: is the live site up? The request to the API also keeps its free host
+# awake (it stops the service after 15 idle minutes, and a cold start takes about a minute).
+# /healthz never touches the database, so Neon can still scale to zero between visitors.
+# A failure emails the repository owner (GitHub's notification for failed scheduled runs).
+# Scheduled runs can start late or be skipped when GitHub is busy; the web app also shows a
+# "waking up" state and retries, so a missed ping costs a slow first check, not an error.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    # Until the site is deployed there is nothing to check.
+    if: vars.API_URL != '' && vars.WEB_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      API_URL: ${{ vars.API_URL }}
+      WEB_URL: ${{ vars.WEB_URL }}
+    steps:
+      - name: API answers
+        run: >-
+          curl --fail --silent --show-error --max-time 90
+          --retry 3 --retry-delay 15 --retry-all-errors
+          "$API_URL/healthz"
+      - name: Site answers
+        run: >-
+          curl --fail --silent --show-error --max-time 30
+          --retry 2 --retry-delay 10 --retry-all-errors
+          --output /dev/null "$WEB_URL/"

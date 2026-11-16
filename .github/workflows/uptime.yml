@@ -1,6 +1,6 @@
 name: Uptime
 
-# Every ten minutes: is the live site up? The request to the API also keeps its free host
+# Every ten minutes during the day: is the live site up? The request to the API also keeps its free host
 # awake (it stops the service after 15 idle minutes, and a cold start takes about a minute).
 # /healthz never touches the database, so Neon can still scale to zero between visitors.
 # A failure emails the repository owner (GitHub's notification for failed scheduled runs).
@@ -9,7 +9,9 @@ name: Uptime
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # 6am-10pm Pacific only: the Render workspace's 750 free hours a month are shared with
+    # another service, so the API is allowed to sleep overnight (about 490 hours awake).
+    - cron: "*/10 14-23,0-5 * * *"
   workflow_dispatch:
 
 permissions: {}

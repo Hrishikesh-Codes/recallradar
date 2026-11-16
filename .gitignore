@@ -50,3 +50,5 @@ apps/web/public/ocr/
 
 # Private launch notes for the next session (like SPEC.md)
 LAUNCH.md
+# Vercel CLI link (project and org ids)
+.vercel

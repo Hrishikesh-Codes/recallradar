@@ -1,0 +1,51 @@
+name: Deploy
+
+# After CI passes on main: migrate the production database, then ask the API host to deploy
+# that commit. (The web app deploys itself: Vercel builds every push to main.) Migrations run
+# from here because the API host can't: its build has no database access, and a new API version
+# must never start against an older schema.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync # never alongside the daily sync, an import, or a reseed
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.COMMIT }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - run: uv sync --package recallradar-core --frozen --no-dev
+      - name: Migrate the production database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: uv run alembic -c packages/core/alembic.ini upgrade head
+      - name: Deploy the API (Render deploy hook)
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL isn't set: deploy the API by hand (render deploys create)."
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 60 --request POST \
+            "${RENDER_DEPLOY_HOOK_URL}&ref=${COMMIT}" --output /dev/null
+          echo "Asked Render to deploy ${COMMIT}."

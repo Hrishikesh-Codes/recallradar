@@ -12,7 +12,9 @@ const from = process.env.MAIL_FROM ?? "RecallRadar <sign-in@localhost>";
 export async function sendSignInLink(email: string, url: string): Promise<void> {
   await transport.sendMail({
     from,
-    to: email,
+    // A structured address is used as given; a plain string would be parsed, and a crafted
+    // "address" could then name a second recipient for someone else's sign-in link.
+    to: { name: "", address: email },
     subject: "Your RecallRadar sign-in link",
     text: [
       "Hello,",

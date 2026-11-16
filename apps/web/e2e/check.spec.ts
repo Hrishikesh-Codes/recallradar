@@ -205,7 +205,8 @@ test("a label photo is read on the device and checked as text", async ({ page },
   });
   const text = page.getByRole("textbox", { name: /What we read/ });
   await expect(text).toHaveValue(/WL33006DMN/, { timeout: 90_000 });
-  await expect(page.getByText("DR POWER LEAF VACUUM")).toBeVisible();
+  // The name shows in the preview; the OCR text box can repeat it, so take the first.
+  await expect(page.getByText("DR POWER LEAF VACUUM").first()).toBeVisible();
   await page.getByRole("button", { name: "Check it" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "Recalled" })).toBeVisible();
   const last = api.checks.at(-1) as { input: { type: string; value: string } };

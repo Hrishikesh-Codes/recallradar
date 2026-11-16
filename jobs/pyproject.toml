@@ -16,6 +16,7 @@ recallradar-sync = "recallradar_jobs.sync_cli:main"
 recallradar-embed = "recallradar_jobs.embed_cli:main"
 recallradar-eval = "recallradar_jobs.eval_cli:main"
 recallradar-alerts = "recallradar_jobs.alerts_cli:main"
+recallradar-storage = "recallradar_jobs.storage_cli:main"
 
 [tool.uv.sources]
 recallradar-core = { workspace = true }

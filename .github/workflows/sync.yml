@@ -32,6 +32,9 @@ jobs:
       VECTOR_DATABASE_URL: ${{ secrets.VECTOR_DATABASE_URL }}
       OPENFDA_API_KEY: ${{ secrets.OPENFDA_API_KEY }}
       SMTP_URL: ${{ secrets.SMTP_URL }}
+      # Web Push (the public half is the web app's NEXT_PUBLIC_VAPID_PUBLIC_KEY).
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
       MAIL_FROM: ${{ vars.MAIL_FROM }}
       WEB_URL: ${{ vars.WEB_URL }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
@@ -56,6 +59,9 @@ jobs:
         run: uv run recallradar-embed
       - name: Re-check watched items and send alerts
         run: uv run recallradar-alerts
+      - name: Check storage headroom (Neon caps a free database at 512 MiB)
+        if: always()
+        run: uv run recallradar-storage
       - name: Fail the run if a source failed to sync
         if: steps.sync.outcome == 'failure'
         run: exit 1

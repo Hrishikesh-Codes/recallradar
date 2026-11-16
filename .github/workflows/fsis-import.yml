@@ -1,0 +1,52 @@
+name: Import USDA FSIS recalls
+
+# FSIS's CDN refuses scripted requests, so meat, poultry and egg recalls can't be synced
+# automatically. A copy of https://www.fsis.usda.gov/fsis/api/recall/v/1 saved from a browser is
+# kept as an asset of a *draft* release (visible only to people with write access: the raw file
+# names company contacts, which our parser never stores), and this workflow imports it:
+#
+#   gh release create fsis-data --draft --title "FSIS data" --notes "Not for publishing." fsis.json
+#   gh release upload fsis-data fsis.json --clobber      # later refreshes
+#   gh workflow run fsis-import.yml
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # draft releases can only be read with write access
+
+concurrency:
+  group: sync # never alongside the daily sync or a reseed
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ENVIRONMENT: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      VECTOR_DATABASE_URL: ${{ secrets.VECTOR_DATABASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - run: uv sync --package recallradar-jobs --frozen --no-dev
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/recallradar/models
+          key: embedding-model-bge-small-en-v1.5
+      - name: Download the saved FSIS response
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download fsis-data --pattern fsis.json --dir "$RUNNER_TEMP"
+      - name: Migrate
+        run: uv run alembic -c packages/core/alembic.ini upgrade head
+      - name: Import
+        run: uv run recallradar-sync --source fsis --mode backfill --file "$RUNNER_TEMP/fsis.json"
+      - name: Embed new products
+        run: uv run recallradar-embed
+      - name: Check storage headroom
+        run: uv run recallradar-storage

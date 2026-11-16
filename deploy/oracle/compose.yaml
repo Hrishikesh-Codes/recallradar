@@ -6,7 +6,7 @@ services:
   api:
     build:
       context: ../..
-      dockerfile: apps/api/Dockerfile
+      dockerfile: Dockerfile
     image: recallradar-api:deployed
     env_file: ${RECALLRADAR_ENV_FILE:-/opt/recallradar/.env}
     environment:

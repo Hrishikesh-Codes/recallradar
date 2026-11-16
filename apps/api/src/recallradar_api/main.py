@@ -46,6 +46,7 @@ def create_app(settings: Settings | None = None, state: AppState | None = None) 
         yield
 
     app = FastAPI(title="RecallRadar API", version=__version__, lifespan=lifespan)
+    app.state.client_ip_header = settings.client_ip_header
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

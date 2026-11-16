@@ -1,5 +1,7 @@
-# API image. Built from the repo root:  docker build -f apps/api/Dockerfile .
-# Runs as uid 1000 on port $PORT (7860 by default); deploy/oracle/compose.yaml runs it in production.
+# The API image (FastAPI + matching engine + the embedding model). It lives at the repo root
+# because the build needs the whole workspace, and hosts that build from a Git URL (Render)
+# look for ./Dockerfile:  docker build -t recallradar-api .
+# Runs as uid 1000 on port $PORT (7860 by default; Render sets its own).
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /usr/local/bin/uv
@@ -28,5 +30,6 @@ ENV HF_HUB_OFFLINE=1
 
 EXPOSE 7860
 # Behind a reverse proxy the client address (for rate limits) comes from X-Forwarded-For, trusted
-# only from the addresses in $FORWARDED_ALLOW_IPS (uvicorn's default: 127.0.0.1 only).
+# only from the addresses in $FORWARDED_ALLOW_IPS (uvicorn's default: 127.0.0.1 only). Behind
+# Cloudflare (Render), set CLIENT_IP_HEADER=CF-Connecting-IP instead.
 CMD ["sh", "-c", "exec uvicorn recallradar_api.main:create_app --factory --host 0.0.0.0 --port ${PORT} --proxy-headers"]

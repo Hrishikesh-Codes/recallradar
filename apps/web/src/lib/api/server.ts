@@ -11,6 +11,8 @@ export type Item = components["schemas"]["ItemOut"];
 export type Me = components["schemas"]["Me"];
 export type AccountSettings = components["schemas"]["SettingsOut"];
 
+const API_TIMEOUT_MS = 20_000;
+
 export type Viewer = { id: string; email: string | null; isAnonymous: boolean };
 
 /** The signed-in user for this request, or null. Reads cookies: call it behind <Suspense>. */
@@ -44,15 +46,22 @@ export async function userFetch<T>(
     .setIssuedAt()
     .setExpirationTime("2m")
     .sign(apiSecret());
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...init.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      cache: "no-store",
+      // The free API host can be asleep; don't hold a page (or a serverless function) for it.
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...init.headers,
+      },
+    });
+  } catch {
+    throw new ApiError("The recall service is waking up. Please try again in a moment.", 503);
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { detail?: unknown } | null;
     const detail = typeof body?.detail === "string" ? body.detail : "Something went wrong.";

@@ -6,14 +6,25 @@ import { CheckForm, EXAMPLES } from "@/components/check/CheckForm";
 import { Checking } from "@/components/check/Checking";
 import { VerdictView } from "@/components/check/VerdictView";
 import { cn } from "@/lib/cn";
-import { ApiError, checkProduct, type CheckInput, type CheckResponse } from "@/lib/api/client";
+import {
+  ApiError,
+  checkProduct,
+  isWaking,
+  wakeApi,
+  type CheckInput,
+  type CheckResponse,
+} from "@/lib/api/client";
 import { takePendingCheck } from "@/lib/pendingCheck";
 
 type State =
   | { kind: "idle" }
-  | { kind: "checking"; input: CheckInput }
+  | { kind: "checking"; input: CheckInput; slow?: boolean }
   | { kind: "done"; input: CheckInput; result: CheckResponse }
   | { kind: "error"; input: CheckInput; message: string };
+
+const SLOW_AFTER_MS = 5000;
+const RETRY_EVERY_MS = 4000;
+const WAKE_BUDGET_MS = 90_000;
 
 export function CheckExperience({ recalls }: { recalls?: number }) {
   const [state, setState] = useState<State>({ kind: "idle" });
@@ -25,16 +36,37 @@ export function CheckExperience({ recalls }: { recalls?: number }) {
     const abort = new AbortController();
     controller.current = abort;
     setState({ kind: "checking", input });
+    // A check normally takes well under a second. When it doesn't, the API host is waking up:
+    // say so, and keep trying for as long as a cold start can take.
+    const slow = window.setTimeout(() => {
+      if (!abort.signal.aborted) setState({ kind: "checking", input, slow: true });
+    }, SLOW_AFTER_MS);
+    const deadline = Date.now() + WAKE_BUDGET_MS;
     try {
-      const result = await checkProduct(input, { signal: abort.signal });
-      setState({ kind: "done", input, result });
+      for (;;) {
+        try {
+          const result = await checkProduct(input, { signal: abort.signal });
+          setState({ kind: "done", input, result });
+          return;
+        } catch (error) {
+          if (abort.signal.aborted) return;
+          if (!isWaking(error) || Date.now() > deadline) throw error;
+          setState({ kind: "checking", input, slow: true });
+          await new Promise((resolve) => window.setTimeout(resolve, RETRY_EVERY_MS));
+          if (abort.signal.aborted) return;
+        }
+      }
     } catch (error) {
-      if (abort.signal.aborted) return;
       const message =
         error instanceof ApiError ? error.message : "Something went wrong. Please try again.";
       setState({ kind: "error", input, message });
+    } finally {
+      window.clearTimeout(slow);
     }
   }, []);
+
+  // Someone opening this page is about to check something: start waking the API now.
+  useEffect(wakeApi, []);
 
   // Read once per mount; a ref survives React's development double-run of effects.
   const pendingRef = useRef<CheckInput | null | undefined>(undefined);
@@ -73,7 +105,7 @@ export function CheckExperience({ recalls }: { recalls?: number }) {
       {/* Each state rises into place as it appears (CSS, .rise-in). */}
       {state.kind === "checking" ? (
         <div className="rise-in">
-          <Checking recalls={recalls} />
+          <Checking recalls={recalls} waking={state.slow} />
         </div>
       ) : null}
       {state.kind === "done" ? (

@@ -98,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: docker build -f apps/api/Dockerfile -t recallradar-api:ci .
+      - run: docker build -t recallradar-api:ci .
       - name: Container starts and answers /healthz
         run: |
           docker run -d --name api -p 7860:7860 recallradar-api:ci

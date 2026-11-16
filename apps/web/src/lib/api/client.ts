@@ -49,6 +49,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * True when the API host looks asleep or mid-restart rather than broken: the free host stops the
+ * service after 15 idle minutes and takes up to a minute to start it again.
+ */
+export function isWaking(error: unknown): boolean {
+  return error instanceof ApiError && [0, 502, 503, 504].includes(error.status);
+}
+
+/** Nudge the API awake (no database, no data). Fire and forget, at most once per page load. */
+let woken = false;
+export function wakeApi(): void {
+  if (woken || typeof window === "undefined") return;
+  woken = true;
+  void fetch(`${API_URL}/healthz`, { cache: "no-store" }).catch(() => {});
+}
+
 export function checkProduct(
   input: CheckInput,
   options: { purchaseDate?: string; signal?: AbortSignal } = {},

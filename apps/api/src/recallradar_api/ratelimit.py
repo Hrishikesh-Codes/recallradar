@@ -43,8 +43,14 @@ class RateLimiter:
 
 
 def client_key(request: Request) -> str:
+    """The address a rate limit counts against. Callers must not be able to choose it."""
+    # Behind Cloudflare (Render), the edge overwrites this header with the real client address;
+    # X-Forwarded-For there keeps whatever the caller sent first, so it can't be trusted.
+    header: str | None = getattr(request.app.state, "client_ip_header", None)
+    if header and (value := request.headers.get(header, "").strip()):
+        return value[:64]
     # Behind Caddy, uvicorn's --proxy-headers sets this from X-Forwarded-For, which it trusts only
-    # from FORWARDED_ALLOW_IPS (the compose network), so clients can't choose their own address.
+    # from FORWARDED_ALLOW_IPS (the compose network).
     return request.client.host if request.client else "unknown"
 
 

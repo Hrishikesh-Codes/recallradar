@@ -96,7 +96,7 @@ defaults. Never commit real secrets.
 
 ```
 apps/web            Next.js PWA
-apps/api            FastAPI service (+ Dockerfile)
+apps/api            FastAPI service (image: ./Dockerfile)
 deploy/oracle       production compose + Caddy + cloud-init for the API's VM
 packages/core       settings, logging, models, migrations
 packages/ingest     CPSC + openFDA ingesters, extraction

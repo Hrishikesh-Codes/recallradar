@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # Optional: raises openFDA's limit from 1,000 to 120,000 requests/day.
     openfda_api_key: str | None = None
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+    # The header a trusted edge sets to the client's address, for rate limits. Only set this
+    # when every request passes through that edge and it overwrites what callers send:
+    # "CF-Connecting-IP" on Render (Cloudflare). Unset: the connection's address (uvicorn's
+    # --proxy-headers, trusted from FORWARDED_ALLOW_IPS).
+    client_ip_header: str | None = None
     # Shared with the web server, which signs a short-lived token per request for signed-in
     # users (HS256). Without it, account endpoints are disabled.
     api_token_secret: SecretStr | None = None

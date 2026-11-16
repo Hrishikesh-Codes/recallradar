@@ -147,7 +147,7 @@ Facts cache), `feedback` ("This is mine" / "Not my product" labels, not linked t
 | Path | What lives there |
 |---|---|
 | `apps/web` | Next.js app: pages, design system (`src/design`, `src/components`), Vitest + Playwright |
-| `apps/api` | FastAPI service and its Dockerfile |
+| `apps/api` | FastAPI service (its image is built by the root `Dockerfile`) |
 | `deploy/oracle` | Production compose file, Caddy config, cloud-init, and the self-deploy script |
 | `packages/core` | Settings, JSON logging, SQLAlchemy models, Alembic migrations |
 | `packages/ingest` | Source ingesters, normalisation, identifier extraction (M1) |

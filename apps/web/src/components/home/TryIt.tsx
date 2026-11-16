@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { wakeApi } from "@/lib/api/client";
 import { savePendingCheck } from "@/lib/pendingCheck";
 
 /** "Try it now" on the landing page: hands the input to /check, which runs it. */
@@ -16,6 +17,8 @@ export function TryIt({
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
+  // A visitor on the landing page may check something soon: start waking the API now.
+  useEffect(wakeApi, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();
